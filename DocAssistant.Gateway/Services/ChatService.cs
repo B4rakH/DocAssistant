@@ -3,22 +3,22 @@ using DocAssistant.Gateway.Common.Enums;
 using DocAssistant.Gateway.Data;
 using DocAssistant.Gateway.Data.Models;
 using DocAssistant.Gateway.Dtos.Chat;
+using DocAssistant.Gateway.Dtos.Events;
 
 namespace DocAssistant.Gateway.Services
 {
     public class ChatService : IChatService
     {
         private readonly AppDbContext _context;
-        //TODO: Create an IMessageProducer interface and its implementation for RabbitMQ
-        //private readonly IMessageProducer _messageProducer;
+        private readonly IRabbitMQService _rabbitMQService;
         private readonly ILogger<ChatService> _logger;
 
        public ChatService(AppDbContext context,
-           //IMessageProducer messageProducer,
+           IRabbitMQService rabbitMQService,
            ILogger<ChatService> logger)
         {
             _context = context;
-            //_messageProducer = messageProducer;
+            _rabbitMQService = rabbitMQService;
             _logger = logger;
         }
 
@@ -91,7 +91,7 @@ namespace DocAssistant.Gateway.Services
 
                 // 3. Notify RabbitMQ (Safe Zone)
                 // Performing this AFTER commit. Despite any fails, the data will be already safe in DB.
-                NotifyPythonWorker(documentsToProcess);
+                await NotifyPythonWorker(documentsToProcess);
 
                 return chat;
             }
@@ -104,30 +104,25 @@ namespace DocAssistant.Gateway.Services
                 // Delete the "Zombie Files" from disk
                 CleanupFiles(createdFilePaths);
 
-                throw; // Re-throw to let the Controller know it failed
+                throw;
             }
         }
-        private void NotifyPythonWorker(List<Document> documents)
+
+        private async Task NotifyPythonWorker(List<Document> documents)
         {
             try
             {
                 foreach (var doc in documents)
                 {
-                    // Sending only what Python needs
-                    // TODO: [Technical Debt] We are using an anonymous object here. 
-                    // Better approach: Create a shared 'DocumentUploadedEvent' class in DTOs.
-                    // Example: _messageProducer.SendMessage(new DocumentUploadedEvent(doc.Id, doc.FilePath));
+                    var uploadEvent = new DocumentUploadedEvent
+                    {
+                        DocumentId = doc.Id,
+                        FilePath = doc.FilePath,
+                        FileSize = doc.FileSize,
+                        ContentType = doc.ContentType
+                    };
 
-                    // TODO: [Implementation Required] The 'RabbitMQProducer' class is not written yet.
-                    // This line will throw a NullReference or Dependency Injection error until we create Services/RabbitMQProducer.cs
-
-
-                    //_messageProducer.SendMessage(new
-                    //{
-                    //    Id = doc.Id,
-                    //    FilePath = doc.FilePath
-                    //});
-
+                    await _rabbitMQService.PublishDocumentUploadedAsync(uploadEvent);
                 }
             }
             catch (Exception ex)

@@ -12,25 +12,36 @@ namespace DocAssistant.Gateway.Controllers
     [ApiController]
     public class ChatController : ControllerBase
     {
-        private readonly IChatRepository _chatRepository;
-
         private readonly ILogger<ChatController> _logger;
 
         private readonly IChatService _chatService;
 
         //File types allowed to upload
         private readonly string[] _allowedExtensions = { ".pdf" };
-        public ChatController(IChatRepository chatRepository,
+
+        public ChatController(
             ILogger<ChatController> logger,
             IChatService chatService)
         {
-            _chatRepository = chatRepository;
             _logger = logger;
             _chatService = chatService;
         }
 
+        [HttpPost]
         public async Task<IActionResult> CreateChat([FromForm] CreateChatRequest request)
         {
+
+            /* TODO: Implement this scenario:
+             * User uploads files
+             * uploaded files saved in database with loading status
+             * frontend keeps file state as loading
+             * RabbitMQ sends files to the AI Service
+             * AI Service performs vectorizing and saving files
+             * AI Service returns success (or fail)
+             * Based on return, file status updated
+             * Based on last file status, frontend updates state
+             * **/
+
             // 1. Input Validation (Controller's Job)
             if (request.Files == null || request.Files.Count == 0)
             {
@@ -41,8 +52,8 @@ namespace DocAssistant.Gateway.Controllers
             // or move them to the Service. Usually, basic validation stays in Controller.
             foreach (var file in request.Files)
             {
-                if (Path.GetExtension(file.FileName).ToLower() != ".pdf")
-                    return BadRequest($"File '{file.FileName}' is not a PDF.");
+                if (!_allowedExtensions.Contains(Path.GetExtension(file.FileName).ToLower()))
+                    return BadRequest($"File '{file.FileName}' is not allowed.");
             }
 
             try
