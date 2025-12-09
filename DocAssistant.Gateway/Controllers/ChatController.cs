@@ -1,7 +1,4 @@
-﻿using DocAssistant.Gateway.Common.Enums;
-using DocAssistant.Gateway.Data.Models;
-using DocAssistant.Gateway.Dtos.Chat;
-using DocAssistant.Gateway.Repositories;
+﻿using DocAssistant.Gateway.Dtos.Chat;
 using DocAssistant.Gateway.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -37,7 +34,8 @@ namespace DocAssistant.Gateway.Controllers
              * frontend keeps file state as loading
              * RabbitMQ sends files to the AI Service
              * AI Service performs vectorizing and saving files
-             * AI Service returns success (or fail)
+             * AI Service returns success if it is
+                ** AI Service fails (with SignalR ?)
              * Based on return, file status updated
              * Based on last file status, frontend updates state
              * **/
@@ -65,7 +63,7 @@ namespace DocAssistant.Gateway.Controllers
                 return Ok(new
                 {
                     ChatId = chat.Id,
-                    Message = "Chat created successfully. Processing started."
+                    Message = "Chat created successfully."
                 });
             }
             catch (Exception ex)

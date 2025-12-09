@@ -1,5 +1,6 @@
 using DocAssistant.Gateway.Data;
 using DocAssistant.Gateway.Services;
+using DotNetEnv;
 using Microsoft.EntityFrameworkCore;
 
 namespace DocAssistant.Gateway
@@ -8,26 +9,30 @@ namespace DocAssistant.Gateway
     {
         public static void Main(string[] args)
         {
+
+            Env.Load();
+
             var builder = WebApplication.CreateBuilder(args);
 
-
-            // ===== DELETE AFTER POSTGRESQL CONFIG START =====
-            // Temporary InMemory Database for testing
+            string DbConnectionString = builder.Configuration["POSTGRES_CONNECTION_STRING"];
             builder.Services.AddDbContext<AppDbContext>(options =>
-                options.UseInMemoryDatabase("DocAssistantInMemoryDb"));
-            // ===== DELETE AFTER POSTGRESQL CONFIG END =====
-
-
+                options.UseNpgsql(DbConnectionString));
 
             // Add services to the container.
             builder.Services.AddScoped<IChatService, ChatService>();
-            
-            // Register RabbitMQ service
-            builder.Services.AddSingleton<IRabbitMQService>(sp =>
+
+            // Register RabbitMQ service (concrete) and map IMessageProducer to same instance
+            builder.Services.AddSingleton<RabbitMqService>(sp =>
             {
                 var logger = sp.GetRequiredService<ILogger<RabbitMqService>>();
                 return RabbitMqService.CreateServiceAsync(logger).GetAwaiter().GetResult();
             });
+
+            // Map interface to the concrete instance
+            builder.Services.AddSingleton<IMessageProducer>(sp => sp.GetRequiredService<RabbitMqService>());
+
+            // Register background consumer that updates DB when results arrive
+            builder.Services.AddHostedService<DocumentResultsConsumer>();
 
             builder.Services.AddControllers();
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -35,17 +40,6 @@ namespace DocAssistant.Gateway
             builder.Services.AddSwaggerGen();
 
             var app = builder.Build();
-
-
-            // ===== DELETE AFTER POSTGRESQL CONFIG START =====
-            // Ensure InMemory database is created
-            using (var scope = app.Services.CreateScope())
-            {
-                var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                dbContext.Database.EnsureCreated();
-            }
-            // ===== DELETE AFTER POSTGRESQL CONFIG END =====
-
 
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())

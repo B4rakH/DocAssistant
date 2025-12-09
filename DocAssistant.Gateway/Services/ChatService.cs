@@ -10,11 +10,11 @@ namespace DocAssistant.Gateway.Services
     public class ChatService : IChatService
     {
         private readonly AppDbContext _context;
-        private readonly IRabbitMQService _rabbitMQService;
+        private readonly IMessageProducer _rabbitMQService;
         private readonly ILogger<ChatService> _logger;
 
        public ChatService(AppDbContext context,
-           IRabbitMQService rabbitMQService,
+           IMessageProducer rabbitMQService,
            ILogger<ChatService> logger)
         {
             _context = context;
@@ -24,19 +24,19 @@ namespace DocAssistant.Gateway.Services
 
         public async Task<Chat> CreateChatWithDocumentsAsync(CreateChatRequest request)
         {
-            // 1. Preparation
+            // Get upload directory path
             var uploadsFolder = FolderPath.GetUploadsFolder();
 
-            // Lists to track state for Rollback or Notification
+            // Track files for cleanup on failure
             var createdFilePaths = new List<string>();
             var documentsToProcess = new List<Document>();
 
-            // 2. Begin Transaction (Atomic Operation)
+            // Start database transaction for atomic operations
             using var transaction = await _context.Database.BeginTransactionAsync();
 
             try
             {
-                // A. Create the Chat Session
+                // Create new chat session
                 var chat = new Chat
                 {
                     Name = request.Name
@@ -45,23 +45,22 @@ namespace DocAssistant.Gateway.Services
                 _context.Chats.Add(chat);
                 await _context.SaveChangesAsync();
 
-                // B. Loop through Files
+                // Process each uploaded file
                 foreach (var file in request.Files)
                 {
                     if (file.Length > 0)
                     {
-                        // --- Disk Operation ---
-
-                        //Saving files to the upload folder
+                        // Save file to disk with unique name
                         var safeFileName = $"{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
                         var filePath = Path.Combine(uploadsFolder, safeFileName);
 
-                        using (var stream = new FileStream(filePath, FileMode.Create)) await file.CopyToAsync(stream);
+                        using (var stream = new FileStream(filePath, FileMode.Create)) 
+                            await file.CopyToAsync(stream);
 
-                        // Add to list immediately (so we can delete it if error occurs later)
+                        // Track for potential rollback
                         createdFilePaths.Add(filePath);
 
-                        // --- Database Operation ---
+                        // Create document record with Pending status
                         var document = new Document
                         {
                             FileName = file.FileName,
@@ -73,35 +72,34 @@ namespace DocAssistant.Gateway.Services
 
                         _context.Documents.Add(document);
 
-                        // Link Document to Chat (Many-to-Many)
+                        // Link document to chat
                         _context.ChatDocuments.Add(new ChatDocument
                         {
                             ChatId = chat.Id,
                             Document = document
                         });
 
-                        // Add to list for RabbitMQ
+                        // Queue for RabbitMQ notification
                         documentsToProcess.Add(document);
                     }
                 }
 
-                // C. Commit Everything
+                // Commit all database changes
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
-                // 3. Notify RabbitMQ (Safe Zone)
-                // Performing this AFTER commit. Despite any fails, the data will be already safe in DB.
+                // Send to RabbitMQ after successful commit
                 await NotifyPythonWorker(documentsToProcess);
 
                 return chat;
             }
             catch (Exception ex)
             {
-                // 4. Rollback Strategy
+                // Rollback database changes
                 await transaction.RollbackAsync();
                 _logger.LogError(ex, "Transaction failed in CreateChatWithDocumentsAsync. Rolling back.");
 
-                // Delete the "Zombie Files" from disk
+                // Delete files from disk
                 CleanupFiles(createdFilePaths);
 
                 throw;
@@ -110,8 +108,11 @@ namespace DocAssistant.Gateway.Services
 
         private async Task NotifyPythonWorker(List<Document> documents)
         {
+            var failedDocuments = new List<Guid>();
+
             try
             {
+                // Publish each document to RabbitMQ
                 foreach (var doc in documents)
                 {
                     var uploadEvent = new DocumentUploadedEvent
@@ -122,25 +123,38 @@ namespace DocAssistant.Gateway.Services
                         ContentType = doc.ContentType
                     };
 
-                    await _rabbitMQService.PublishDocumentUploadedAsync(uploadEvent);
+                    var isSuccess = await _rabbitMQService.PublishDocumentUploadedAsync(uploadEvent);
+
+                    // Mark as Failed if publish unsuccessful
+                    if (!isSuccess)
+                    {
+                        doc.Status = DocumentStatus.Failed;
+                        failedDocuments.Add(doc.Id);
+                        _logger.LogError("Failed to publish DocumentUploadedEvent for DocumentId: {DocumentId}", doc.Id);
+                    }
                 }
+
+                // Save failed status changes
+                if(failedDocuments.Count != 0)
+                    await _context.SaveChangesAsync();
+                
             }
             catch (Exception ex)
             {
-                // We log this but do NOT throw. 
-                // The Chat is already created successfully. We don't want to show "Error" to user 
-                // just because the Queue is temporarily down.
+                // Don't throw - chat already created successfully
                 _logger.LogError(ex, "Failed to send messages to RabbitMQ. Documents are stuck in Pending.");
             }
         }
 
         private void CleanupFiles(List<string> filePaths)
         {
+            // Delete files during rollback
             foreach (var path in filePaths)
             {
                 try
                 {
-                    if (File.Exists(path)) File.Delete(path);
+                    if (File.Exists(path))
+                        File.Delete(path);
                 }
                 catch (Exception ex)
                 {
