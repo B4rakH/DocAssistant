@@ -1,7 +1,7 @@
 ﻿services:
   postgres-server:
     image: postgres:16
-    container_name: doc-assistant-gateway-postgres-container
+    container_name: postgres-doc-assistant-gateway
     restart: always
     
     environment:

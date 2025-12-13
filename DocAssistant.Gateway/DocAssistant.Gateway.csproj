@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="DotNetEnv" Version="3.1.1" />
+    <PackageReference Include="MassTransit" Version="8.5.7" />
     <PackageReference Include="MassTransit.RabbitMQ" Version="8.5.7" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.11" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.11">
@@ -29,7 +30,8 @@
 
   <ItemGroup>
     <Folder Include="Mappers\" />
-    <Folder Include="Repositories\" />
+    <Folder Include="Constracts\" />
+    <Folder Include="Migrations\" />
   </ItemGroup>
 
 </Project>

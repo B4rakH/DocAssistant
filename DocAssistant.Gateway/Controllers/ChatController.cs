@@ -57,13 +57,14 @@ namespace DocAssistant.Gateway.Controllers
             try
             {
                 // 2. Delegate to Service (The Heavy Lifting)
+                //TODO: Fix the file name (it sees id as name)
                 var chat = await _chatService.CreateChatWithDocumentsAsync(request);
 
                 // 3. Return Success
                 return Ok(new
                 {
                     ChatId = chat.Id,
-                    Message = "Chat created successfully."
+                    Message = "Chat created successfully. Waiting documents to be uploaded."
                 });
             }
             catch (Exception ex)

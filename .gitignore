@@ -366,3 +366,4 @@ FodyWeavers.xsd
 *.env
 uploaded_files/
 Migrations
+TaskList.txt

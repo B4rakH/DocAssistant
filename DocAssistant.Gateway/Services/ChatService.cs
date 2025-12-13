@@ -4,22 +4,23 @@ using DocAssistant.Gateway.Data;
 using DocAssistant.Gateway.Data.Models;
 using DocAssistant.Gateway.Dtos.Chat;
 using DocAssistant.Gateway.Dtos.Events;
+using MassTransit;
 
 namespace DocAssistant.Gateway.Services
 {
     public class ChatService : IChatService
     {
         private readonly AppDbContext _context;
-        private readonly IMessageProducer _rabbitMQService;
+        private readonly ISendEndpointProvider _endpointProvider;
         private readonly ILogger<ChatService> _logger;
 
        public ChatService(AppDbContext context,
-           IMessageProducer rabbitMQService,
-           ILogger<ChatService> logger)
+           ILogger<ChatService> logger,
+           ISendEndpointProvider endpointProvider)
         {
             _context = context;
-            _rabbitMQService = rabbitMQService;
             _logger = logger;
+            _endpointProvider = endpointProvider;
         }
 
         public async Task<Chat> CreateChatWithDocumentsAsync(CreateChatRequest request)
@@ -108,10 +109,10 @@ namespace DocAssistant.Gateway.Services
 
         private async Task NotifyPythonWorker(List<Document> documents)
         {
-            var failedDocuments = new List<Guid>();
-
             try
             {
+                var endpoint = await _endpointProvider.GetSendEndpoint(new Uri("queue:documents.uploaded"));
+                
                 // Publish each document to RabbitMQ
                 foreach (var doc in documents)
                 {
@@ -123,21 +124,9 @@ namespace DocAssistant.Gateway.Services
                         ContentType = doc.ContentType
                     };
 
-                    var isSuccess = await _rabbitMQService.PublishDocumentUploadedAsync(uploadEvent);
-
-                    // Mark as Failed if publish unsuccessful
-                    if (!isSuccess)
-                    {
-                        doc.Status = DocumentStatus.Failed;
-                        failedDocuments.Add(doc.Id);
-                        _logger.LogError("Failed to publish DocumentUploadedEvent for DocumentId: {DocumentId}", doc.Id);
-                    }
+                    //TODO: Manage this fire-and-forget better
+                    await endpoint.Send(uploadEvent);
                 }
-
-                // Save failed status changes
-                if(failedDocuments.Count != 0)
-                    await _context.SaveChangesAsync();
-                
             }
             catch (Exception ex)
             {

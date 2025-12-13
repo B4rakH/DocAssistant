@@ -1,6 +1,7 @@
 using DocAssistant.Gateway.Data;
 using DocAssistant.Gateway.Services;
 using DotNetEnv;
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 
 namespace DocAssistant.Gateway
@@ -21,18 +22,29 @@ namespace DocAssistant.Gateway
             // Add services to the container.
             builder.Services.AddScoped<IChatService, ChatService>();
 
-            // Register RabbitMQ service (concrete) and map IMessageProducer to same instance
-            builder.Services.AddSingleton<RabbitMqService>(sp =>
+            builder.Services.AddMassTransit(x =>
             {
-                var logger = sp.GetRequiredService<ILogger<RabbitMqService>>();
-                return RabbitMqService.CreateServiceAsync(logger).GetAwaiter().GetResult();
+                x.AddConsumer<DocumentResultConsumer>();
+
+                x.UsingRabbitMq((context, cfg) =>
+                {
+                    cfg.Host(new Uri(Environment.GetEnvironmentVariable("RABBITMQ_URI") ?? throw new Exception("RabbitMQ Uri cannot found")), h =>
+                    {
+                        h.Username(Environment.GetEnvironmentVariable("RABBITMQ_USERNAME") ?? throw new Exception("Username cannot found"));
+                        h.Password(Environment.GetEnvironmentVariable("RABBITMQ_PASSWORD") ?? throw new Exception("Password cannot found"));
+                    });
+
+                    cfg.UseRawJsonDeserializer();
+
+                    
+                    cfg.ReceiveEndpoint("documents.results", e =>
+                    {
+                        e.ConfigureConsumer<DocumentResultConsumer>(context);
+
+                        //e.UseMessageRetry(r => r.Interval(3, TimeSpan.FromSeconds(5)));
+                    });
+                });
             });
-
-            // Map interface to the concrete instance
-            builder.Services.AddSingleton<IMessageProducer>(sp => sp.GetRequiredService<RabbitMqService>());
-
-            // Register background consumer that updates DB when results arrive
-            builder.Services.AddHostedService<DocumentResultsConsumer>();
 
             builder.Services.AddControllers();
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
