@@ -7,8 +7,7 @@ namespace DocAssistant.Gateway.Data.Models
         [Key]
         public Guid Id { get; set; } = Guid.NewGuid();
 
-        // e.g., "Budget Analysis 2024"
-        [MaxLength(200)]
+        [MaxLength(20)]
         public string Name { get; set; } = "New Chat";
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

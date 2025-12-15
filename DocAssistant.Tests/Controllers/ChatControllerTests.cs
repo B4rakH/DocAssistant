@@ -68,7 +68,7 @@ namespace DocAssistant.Tests.Controllers
             };
 
             _mockChatService
-                .Setup(s => s.CreateChatWithDocumentsAsync(It.IsAny<CreateChatRequest>()))
+                .Setup(s => s.CreateChatAsync(It.IsAny<CreateChatRequest>()))
                 .ReturnsAsync(expectedChat);
 
             // Act
@@ -108,7 +108,7 @@ namespace DocAssistant.Tests.Controllers
             };
 
             _mockChatService
-                .Setup(s => s.CreateChatWithDocumentsAsync(It.IsAny<CreateChatRequest>()))
+                .Setup(s => s.CreateChatAsync(It.IsAny<CreateChatRequest>()))
                 .ReturnsAsync(expectedChat);
 
             // Act
@@ -116,7 +116,7 @@ namespace DocAssistant.Tests.Controllers
 
             // Assert
             Assert.IsType<OkObjectResult>(result);
-            _mockChatService.Verify(s => s.CreateChatWithDocumentsAsync(request), Times.Once);
+            _mockChatService.Verify(s => s.CreateChatAsync(request), Times.Once);
         }
 
         [Fact]
@@ -132,7 +132,7 @@ namespace DocAssistant.Tests.Controllers
             var expectedChat = new Chat { Id = Guid.NewGuid(), Name = "Test Chat" };
 
             _mockChatService
-                .Setup(s => s.CreateChatWithDocumentsAsync(It.Is<CreateChatRequest>(r => 
+                .Setup(s => s.CreateChatAsync(It.Is<CreateChatRequest>(r => 
                     r.Name == request.Name && r.Files.Count == request.Files.Count)))
                 .ReturnsAsync(expectedChat);
 
@@ -141,7 +141,7 @@ namespace DocAssistant.Tests.Controllers
 
             // Assert
             _mockChatService.Verify(
-                s => s.CreateChatWithDocumentsAsync(It.Is<CreateChatRequest>(r => 
+                s => s.CreateChatAsync(It.Is<CreateChatRequest>(r => 
                     r.Name == request.Name && r.Files.Count == 1)),
                 Times.Once);
         }
@@ -273,7 +273,7 @@ namespace DocAssistant.Tests.Controllers
             var expectedChat = new Chat { Id = Guid.NewGuid(), Name = "Test Chat" };
 
             _mockChatService
-                .Setup(s => s.CreateChatWithDocumentsAsync(It.IsAny<CreateChatRequest>()))
+                .Setup(s => s.CreateChatAsync(It.IsAny<CreateChatRequest>()))
                 .ReturnsAsync(expectedChat);
 
             // Act
@@ -298,7 +298,7 @@ namespace DocAssistant.Tests.Controllers
             };
 
             _mockChatService
-                .Setup(s => s.CreateChatWithDocumentsAsync(It.IsAny<CreateChatRequest>()))
+                .Setup(s => s.CreateChatAsync(It.IsAny<CreateChatRequest>()))
                 .ThrowsAsync(new Exception("Database error"));
 
             // Act
@@ -323,7 +323,7 @@ namespace DocAssistant.Tests.Controllers
             var expectedException = new Exception("Test exception");
 
             _mockChatService
-                .Setup(s => s.CreateChatWithDocumentsAsync(It.IsAny<CreateChatRequest>()))
+                .Setup(s => s.CreateChatAsync(It.IsAny<CreateChatRequest>()))
                 .ThrowsAsync(expectedException);
 
             // Act
@@ -351,7 +351,7 @@ namespace DocAssistant.Tests.Controllers
             };
 
             _mockChatService
-                .Setup(s => s.CreateChatWithDocumentsAsync(It.IsAny<CreateChatRequest>()))
+                .Setup(s => s.CreateChatAsync(It.IsAny<CreateChatRequest>()))
                 .ThrowsAsync(new InvalidOperationException("Transaction failed"));
 
             // Act
@@ -382,7 +382,7 @@ namespace DocAssistant.Tests.Controllers
             var expectedChat = new Chat { Id = Guid.NewGuid(), Name = "Test Chat" };
 
             _mockChatService
-                .Setup(s => s.CreateChatWithDocumentsAsync(It.IsAny<CreateChatRequest>()))
+                .Setup(s => s.CreateChatAsync(It.IsAny<CreateChatRequest>()))
                 .ReturnsAsync(expectedChat);
 
             // Act
@@ -405,7 +405,7 @@ namespace DocAssistant.Tests.Controllers
             var expectedChat = new Chat { Id = Guid.NewGuid(), Name = "" };
 
             _mockChatService
-                .Setup(s => s.CreateChatWithDocumentsAsync(It.IsAny<CreateChatRequest>()))
+                .Setup(s => s.CreateChatAsync(It.IsAny<CreateChatRequest>()))
                 .ReturnsAsync(expectedChat);
 
             // Act
@@ -432,7 +432,7 @@ namespace DocAssistant.Tests.Controllers
             var expectedChat = new Chat { Id = Guid.NewGuid(), Name = "Test Chat" };
 
             _mockChatService
-                .Setup(s => s.CreateChatWithDocumentsAsync(It.IsAny<CreateChatRequest>()))
+                .Setup(s => s.CreateChatAsync(It.IsAny<CreateChatRequest>()))
                 .ReturnsAsync(expectedChat);
 
             // Act

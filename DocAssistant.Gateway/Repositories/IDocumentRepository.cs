@@ -1,7 +1,9 @@
-﻿namespace DocAssistant.Gateway.Repositories
+﻿using DocAssistant.Gateway.Data.Models;
+
+namespace DocAssistant.Gateway.Repositories
 {
     public interface IDocumentRepository
     {
-        Task CreateAsync();
+        Task<Document> CreateAsync(IFormFile file, string filePath, bool isTransaction = false);
     }
 }

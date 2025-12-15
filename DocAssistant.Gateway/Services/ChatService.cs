@@ -4,26 +4,21 @@ using DocAssistant.Gateway.Data;
 using DocAssistant.Gateway.Data.Models;
 using DocAssistant.Gateway.Dtos.Chat;
 using DocAssistant.Gateway.Dtos.Events;
+using DocAssistant.Gateway.Mappers;
+using DocAssistant.Gateway.Repositories;
 using MassTransit;
 
 namespace DocAssistant.Gateway.Services
 {
-    public class ChatService : IChatService
+    public class ChatService(
+        AppDbContext context,
+        IChatRepository chatRepository,
+        IDocumentRepository documentRepository,
+        IChatDocumentRepository chatDocumentRepository,
+        ILogger<ChatService> logger,
+        ISendEndpointProvider endpointProvider) : IChatService
     {
-        private readonly AppDbContext _context;
-        private readonly ISendEndpointProvider _endpointProvider;
-        private readonly ILogger<ChatService> _logger;
-
-       public ChatService(AppDbContext context,
-           ILogger<ChatService> logger,
-           ISendEndpointProvider endpointProvider)
-        {
-            _context = context;
-            _logger = logger;
-            _endpointProvider = endpointProvider;
-        }
-
-        public async Task<Chat> CreateChatWithDocumentsAsync(CreateChatRequest request)
+        public async Task<Chat> CreateChatAsync(CreateChatRequest chatRequest)
         {
             // Get upload directory path
             var uploadsFolder = FolderPath.GetUploadsFolder();
@@ -32,22 +27,18 @@ namespace DocAssistant.Gateway.Services
             var createdFilePaths = new List<string>();
             var documentsToProcess = new List<Document>();
 
+
             // Start database transaction for atomic operations
-            using var transaction = await _context.Database.BeginTransactionAsync();
+            // TODO: Start transaction in repository layer instead?
+            using var transaction = await context.Database.BeginTransactionAsync();
 
             try
             {
                 // Create new chat session
-                var chat = new Chat
-                {
-                    Name = request.Name
-                };
-
-                _context.Chats.Add(chat);
-                await _context.SaveChangesAsync();
+                var chat = await chatRepository.CreateAsync(chatRequest, isTransaction:true);
 
                 // Process each uploaded file
-                foreach (var file in request.Files)
+                foreach (var file in chatRequest.Files)
                 {
                     if (file.Length > 0)
                     {
@@ -62,23 +53,15 @@ namespace DocAssistant.Gateway.Services
                         createdFilePaths.Add(filePath);
 
                         // Create document record with Pending status
-                        var document = new Document
-                        {
-                            FileName = file.FileName,
-                            FilePath = filePath,
-                            FileSize = file.Length,
-                            ContentType = file.ContentType,
-                            Status = DocumentStatus.Pending
-                        };
-
-                        _context.Documents.Add(document);
+                        var document = await documentRepository.CreateAsync(file, filePath, isTransaction:true);
 
                         // Link document to chat
-                        _context.ChatDocuments.Add(new ChatDocument
+                        await chatDocumentRepository.CreateAsync(new ChatDocument
                         {
                             ChatId = chat.Id,
                             Document = document
-                        });
+                        },
+                        isTransaction:true);
 
                         // Queue for RabbitMQ notification
                         documentsToProcess.Add(document);
@@ -86,11 +69,11 @@ namespace DocAssistant.Gateway.Services
                 }
 
                 // Commit all database changes
-                await _context.SaveChangesAsync();
+                await context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
                 // Send to RabbitMQ after successful commit
-                await NotifyPythonWorker(documentsToProcess);
+                await SendDocumentAsync(documentsToProcess);
 
                 return chat;
             }
@@ -98,7 +81,7 @@ namespace DocAssistant.Gateway.Services
             {
                 // Rollback database changes
                 await transaction.RollbackAsync();
-                _logger.LogError(ex, "Transaction failed in CreateChatWithDocumentsAsync. Rolling back.");
+                logger.LogError(ex, "Transaction failed in CreateChatWithDocumentsAsync. Rolling back.");
 
                 // Delete files from disk
                 CleanupFiles(createdFilePaths);
@@ -107,31 +90,29 @@ namespace DocAssistant.Gateway.Services
             }
         }
 
-        private async Task NotifyPythonWorker(List<Document> documents)
+        public async Task DeleteChatAsync(Guid chatId)
+        {
+            // TODO: Delete chat with its entities and send message to RabbitMQ
+            // for deleting it on AI service too.
+        }
+
+        private async Task SendDocumentAsync(List<Document> documents)
         {
             try
             {
-                var endpoint = await _endpointProvider.GetSendEndpoint(new Uri("queue:documents.uploaded"));
+                var endpoint = await endpointProvider.GetSendEndpoint(new Uri("queue:documents.uploaded"));
                 
                 // Publish each document to RabbitMQ
                 foreach (var doc in documents)
                 {
-                    var uploadEvent = new DocumentUploadedEvent
-                    {
-                        DocumentId = doc.Id,
-                        FilePath = doc.FilePath,
-                        FileSize = doc.FileSize,
-                        ContentType = doc.ContentType
-                    };
-
-                    //TODO: Manage this fire-and-forget better
-                    await endpoint.Send(uploadEvent);
+                    //TODO: Manage this fire-and-forget better(?)
+                    await endpoint.Send(doc.ToUploadedEventFromModel());
                 }
             }
             catch (Exception ex)
             {
                 // Don't throw - chat already created successfully
-                _logger.LogError(ex, "Failed to send messages to RabbitMQ. Documents are stuck in Pending.");
+                logger.LogError(ex, "Failed to send messages to RabbitMQ. Documents are stuck in Pending.");
             }
         }
 
@@ -143,12 +124,12 @@ namespace DocAssistant.Gateway.Services
                 try
                 {
                     if (File.Exists(path))
-                        File.Delete(path);
+                            File.Delete(path);
                 }
                 catch (Exception ex)
                 {
-                    // Just log, don't crash. We can't do much else.
-                    _logger.LogWarning(ex, $"Failed to delete file during rollback: {path}");
+                    // Just log, don't crash.
+                    logger.LogWarning(ex, $"Failed to delete file during rollback: {path}");
                 }
             }
         }

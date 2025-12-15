@@ -1,4 +1,5 @@
 using DocAssistant.Gateway.Data;
+using DocAssistant.Gateway.Repositories;
 using DocAssistant.Gateway.Services;
 using DotNetEnv;
 using MassTransit;
@@ -15,12 +16,13 @@ namespace DocAssistant.Gateway
 
             var builder = WebApplication.CreateBuilder(args);
 
-            string DbConnectionString = builder.Configuration["POSTGRES_CONNECTION_STRING"];
+            string DbConnectionString = builder.Configuration["POSTGRES_CONNECTION_STRING"]!;
             builder.Services.AddDbContext<AppDbContext>(options =>
                 options.UseNpgsql(DbConnectionString));
 
             // Add services to the container.
             builder.Services.AddScoped<IChatService, ChatService>();
+            builder.Services.AddScoped<IChatMessageService, ChatMessageService>();
 
             builder.Services.AddMassTransit(x =>
             {
@@ -28,10 +30,10 @@ namespace DocAssistant.Gateway
 
                 x.UsingRabbitMq((context, cfg) =>
                 {
-                    cfg.Host(new Uri(Environment.GetEnvironmentVariable("RABBITMQ_URI") ?? throw new Exception("RabbitMQ Uri cannot found")), h =>
+                    cfg.Host(new Uri(builder.Configuration["RABBITMQ_URI"]!), h =>
                     {
-                        h.Username(Environment.GetEnvironmentVariable("RABBITMQ_USERNAME") ?? throw new Exception("Username cannot found"));
-                        h.Password(Environment.GetEnvironmentVariable("RABBITMQ_PASSWORD") ?? throw new Exception("Password cannot found"));
+                        h.Username(builder.Configuration["RABBITMQ_USERNAME"]!);
+                        h.Password(builder.Configuration["RABBITMQ_PASSWORD"]!);
                     });
 
                     cfg.UseRawJsonDeserializer();
@@ -45,6 +47,11 @@ namespace DocAssistant.Gateway
                     });
                 });
             });
+
+            builder.Services.AddScoped<IChatMessageRepository, ChatMessageRepository>();
+            builder.Services.AddScoped<IChatDocumentRepository, ChatDocumentRepository>();
+            builder.Services.AddScoped<IChatRepository, ChatRepository>();
+            builder.Services.AddScoped<IDocumentRepository, DocumentRepository>();
 
             builder.Services.AddControllers();
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

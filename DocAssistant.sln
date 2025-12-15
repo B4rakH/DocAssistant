@@ -11,7 +11,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		TaskList.txt = TaskList.txt
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DocAssistant.Tests", "DocAssistant.Tests\DocAssistant.Tests.csproj", "{335C8533-1F75-417A-B28C-F5D3AC0C6C11}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DocAssistant.Test", "DocAssistant.Tests\DocAssistant.Test.csproj", "{335C8533-1F75-417A-B28C-F5D3AC0C6C11}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

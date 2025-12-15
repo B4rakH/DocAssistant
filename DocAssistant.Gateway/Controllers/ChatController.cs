@@ -7,22 +7,12 @@ namespace DocAssistant.Gateway.Controllers
 {
     [Route("api/chat")]
     [ApiController]
-    public class ChatController : ControllerBase
+    public class ChatController(
+        ILogger<ChatController> logger,
+        IChatService chatService) : ControllerBase
     {
-        private readonly ILogger<ChatController> _logger;
-
-        private readonly IChatService _chatService;
-
         //File types allowed to upload
         private readonly string[] _allowedExtensions = { ".pdf" };
-
-        public ChatController(
-            ILogger<ChatController> logger,
-            IChatService chatService)
-        {
-            _logger = logger;
-            _chatService = chatService;
-        }
 
         [HttpPost]
         public async Task<IActionResult> CreateChat([FromForm] CreateChatRequest request)
@@ -46,8 +36,6 @@ namespace DocAssistant.Gateway.Controllers
                 return BadRequest("At least one PDF file is required.");
             }
 
-            // Optional: You can keep simple file extension checks here 
-            // or move them to the Service. Usually, basic validation stays in Controller.
             foreach (var file in request.Files)
             {
                 if (!_allowedExtensions.Contains(Path.GetExtension(file.FileName).ToLower()))
@@ -58,7 +46,7 @@ namespace DocAssistant.Gateway.Controllers
             {
                 // 2. Delegate to Service (The Heavy Lifting)
                 //TODO: Fix the file name (it sees id as name)
-                var chat = await _chatService.CreateChatWithDocumentsAsync(request);
+                var chat = await chatService.CreateChatAsync(request);
 
                 // 3. Return Success
                 return Ok(new
@@ -70,11 +58,20 @@ namespace DocAssistant.Gateway.Controllers
             catch (Exception ex)
             {
                 // Log the generic error here (Specific errors were logged in the Service)
-                _logger.LogError(ex, "Error in CreateChat endpoint");
+                logger.LogError(ex, "Error in CreateChat endpoint");
 
                 // Return 500 Internal Server Error
                 return StatusCode(500, "An error occurred while creating the chat. Please try again.");
             }
         }
+
+        [HttpDelete]
+        public async Task<IActionResult> Delete([FromBody] Guid chatId)
+        {
+            await chatService.DeleteChatAsync(chatId);
+
+            return NoContent();
+        }
+
     }
 }

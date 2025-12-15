@@ -6,27 +6,18 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DocAssistant.Gateway.Services
 {
-    public class DocumentResultConsumer : IConsumer<DocumentProcessedEvent>
+    public class DocumentResultConsumer(AppDbContext dbContext, ILogger<DocumentResultConsumer> logger) : IConsumer<DocumentProcessedEvent>
     {
-        private readonly AppDbContext _context;
-        private readonly ILogger<DocumentResultConsumer> _logger;
-
-        public DocumentResultConsumer(AppDbContext context, ILogger<DocumentResultConsumer> logger)
-        {
-            _context = context;
-            _logger = logger;
-        }
-
         public async Task Consume(ConsumeContext<DocumentProcessedEvent> context)
         {
             try
             {
                 // Find document by ID
-                var doc = await _context.Documents.FirstOrDefaultAsync(d => d.Id == context.Message.DocumentId, context.CancellationToken);
+                var doc = await dbContext.Documents.FirstOrDefaultAsync(d => d.Id == context.Message.DocumentId, context.CancellationToken);
                 
                 if (doc == null)
                 {
-                    _logger.LogWarning("Document not found for result: {DocumentId}", context.Message.DocumentId);
+                    logger.LogWarning("Document not found for result: {DocumentId}", context.Message.DocumentId);
                     return;
                 }
 
@@ -42,13 +33,13 @@ namespace DocAssistant.Gateway.Services
                 }
 
                 // Save changes to database
-                await _context.SaveChangesAsync(context.CancellationToken);
+                await dbContext.SaveChangesAsync(context.CancellationToken);
 
-                _logger.LogInformation("Document {DocumentId} updated to {Status}", doc.Id, doc.Status);
+                logger.LogInformation("Document {DocumentId} updated to {Status}", doc.Id, doc.Status);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error updating document status for {DocumentId}", context.Message.DocumentId);
+                logger.LogError(ex, "Error updating document status for {DocumentId}", context.Message.DocumentId);
                 throw; // Re-throw to let MassTransit handle retry
             }
         }

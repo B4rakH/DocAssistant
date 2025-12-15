@@ -5,6 +5,8 @@ namespace DocAssistant.Gateway.Services
 {
     public interface IChatService
     {
-        Task<Chat> CreateChatWithDocumentsAsync(CreateChatRequest request);
+        Task<Chat> CreateChatAsync(CreateChatRequest request);
+
+        Task DeleteChatAsync(Guid chatId);
     }
 }

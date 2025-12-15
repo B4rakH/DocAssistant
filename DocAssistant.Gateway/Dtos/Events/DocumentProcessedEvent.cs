@@ -1,6 +1,6 @@
 ﻿namespace DocAssistant.Gateway.Dtos.Events
 {
-    public class DocumentProcessedEvent
+    public record DocumentProcessedEvent
     {
         public Guid DocumentId { get; set; }
         public bool Success { get; set; }
