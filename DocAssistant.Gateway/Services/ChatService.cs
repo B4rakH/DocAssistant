@@ -2,6 +2,7 @@
 using DocAssistant.Gateway.Common.Enums;
 using DocAssistant.Gateway.Data;
 using DocAssistant.Gateway.Data.Models;
+using DocAssistant.Gateway.Dtos.ChatMessage;
 using DocAssistant.Gateway.Dtos.Document;
 using DocAssistant.Gateway.Dtos.Events;
 using DocAssistant.Gateway.Exceptions;
@@ -143,6 +144,11 @@ namespace DocAssistant.Gateway.Services
 
                 throw;
             }
+        }
+
+        public async Task<ChatMessageResponse> PostMessageAsync(Guid chatId, string message)
+        {
+            return null;
         }
 
 

@@ -24,7 +24,6 @@ namespace DocAssistant.Gateway
 
             // Add services to the container.
             builder.Services.AddScoped<IChatService, ChatService>();
-            builder.Services.AddScoped<IChatMessageService, ChatMessageService>();
 
             builder.Services.AddMassTransit(x =>
             {
@@ -51,7 +50,6 @@ namespace DocAssistant.Gateway
             });
 
             builder.Services.AddScoped<IChatMessageRepository, ChatMessageRepository>();
-            builder.Services.AddScoped<IChatDocumentRepository, ChatDocumentRepository>();
             builder.Services.AddScoped<IChatRepository, ChatRepository>();
             builder.Services.AddScoped<IDocumentRepository, DocumentRepository>();
 

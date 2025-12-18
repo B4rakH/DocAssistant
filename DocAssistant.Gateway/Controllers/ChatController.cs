@@ -99,8 +99,13 @@ namespace DocAssistant.Gateway.Controllers
         public async Task<IActionResult> PostMessage([FromBody] string message, [FromRoute] Guid chatId)
         {
             // TODO: Implement message posting logic
+            // CRITICAL: Do not allow post message if chat has any failed (or loading?) document uploads
 
-            return Ok();
+            if(message == string.Empty) return BadRequest("Message cannot be empty");
+
+            var response = await chatService.PostMessageAsync(chatId, message);
+
+            return Ok(response);
         }
 
         [HttpDelete]

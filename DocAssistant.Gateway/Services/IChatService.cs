@@ -1,4 +1,5 @@
 ﻿using DocAssistant.Gateway.Data.Models;
+using DocAssistant.Gateway.Dtos.ChatMessage;
 
 namespace DocAssistant.Gateway.Services
 {
@@ -9,7 +10,9 @@ namespace DocAssistant.Gateway.Services
         Task<Chat> CreateChatAsync(string chatName);
 
         Task<Chat?> GetByIdAsync(Guid chatId);
-        
+
+        Task<ChatMessageResponse> PostMessageAsync(Guid chatId, string message);
+
         Task UploadFilesAsync(Guid chatId, List<IFormFile> files);
         
         Task DeleteChatAsync(Guid chatId);

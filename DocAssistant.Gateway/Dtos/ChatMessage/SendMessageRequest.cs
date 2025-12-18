@@ -8,5 +8,7 @@ namespace DocAssistant.Gateway.Dtos.ChatMessage
         [MinLength(1, ErrorMessage = "Message cannot be empty")]
         [MaxLength(500, ErrorMessage = "Message cannot exceed 5000 characters")]
         public string Content { get; set; } = string.Empty;
+
+        public string Role { get; set; } = "user";
     }
 }
