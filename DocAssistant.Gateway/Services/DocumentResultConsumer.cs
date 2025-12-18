@@ -1,41 +1,41 @@
 ﻿using DocAssistant.Gateway.Common.Enums;
 using DocAssistant.Gateway.Data;
 using DocAssistant.Gateway.Dtos.Events;
+using DocAssistant.Gateway.Repositories;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 
 namespace DocAssistant.Gateway.Services
 {
-    public class DocumentResultConsumer(AppDbContext dbContext, ILogger<DocumentResultConsumer> logger) : IConsumer<DocumentProcessedEvent>
+    public class DocumentResultConsumer(IDocumentRepository documentRepository, ILogger<DocumentResultConsumer> logger) : IConsumer<DocumentProcessedEvent>
     {
         public async Task Consume(ConsumeContext<DocumentProcessedEvent> context)
         {
+            var message = context.Message;
+
             try
             {
-                // Find document by ID
-                var doc = await dbContext.Documents.FirstOrDefaultAsync(d => d.Id == context.Message.DocumentId, context.CancellationToken);
-                
-                if (doc == null)
+
+                var newStatus = message.Success ? DocumentStatus.Completed : DocumentStatus.Failed;
+
+
+                Console.WriteLine($"DocumentId: {message.DocumentId} Success:{message.Success}");
+
+                var updated = await documentRepository.UpdateStatusAsync(
+                                        message.DocumentId,
+                                        newStatus,
+                                        message.ErrorMessage,
+                                        context.CancellationToken);
+
+                if (!updated)
                 {
-                    logger.LogWarning("Document not found for result: {DocumentId}", context.Message.DocumentId);
+                    logger.LogWarning(
+                        "Document not found or already processed: {DocumentId}",
+                        message.DocumentId);
                     return;
                 }
 
-                Console.WriteLine($"DocumentId: {context.Message.DocumentId} Success:{context.Message.Success}");
-
-                // Update document status based on success
-                doc.Status = context.Message.Success ? DocumentStatus.Completed : DocumentStatus.Failed;
-                
-                // Save error message if failed
-                if (!context.Message.Success && !string.IsNullOrWhiteSpace(context.Message.ErrorMessage))
-                {
-                    doc.FailureReason = context.Message.ErrorMessage;
-                }
-
-                // Save changes to database
-                await dbContext.SaveChangesAsync(context.CancellationToken);
-
-                logger.LogInformation("Document {DocumentId} updated to {Status}", doc.Id, doc.Status);
+                logger.LogInformation("Document {DocumentId} updated to {newStatus}", message.DocumentId, newStatus);
             }
             catch (Exception ex)
             {

@@ -6,15 +6,16 @@ namespace DocAssistant.Gateway.Mappers
 {
     public static class DocumentMapper
     {
-        public static Document ToModelFromFile(this IFormFile file, string filePath, DocumentStatus status)
+        public static Document ToModelFromFile(this IFormFile file, Guid chatId, string filePath, DocumentStatus status)
         {
             return new Document
             {
+                ChatId = chatId,
                 FileName = file.FileName,
                 FilePath = filePath,
                 FileSize = file.Length,
                 ContentType = file.ContentType,
-                Status = DocumentStatus.Pending
+                Status = DocumentStatus.Loading
             };
         }
 

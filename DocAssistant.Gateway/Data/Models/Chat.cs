@@ -14,8 +14,6 @@ namespace DocAssistant.Gateway.Data.Models
 
         // Navigation Properties
         public ICollection<ChatMessage> Messages { get; set; } = new List<ChatMessage>();
-
-        // Link to Many Documents
-        public ICollection<ChatDocument> ChatDocuments { get; set; } = new List<ChatDocument>();
+        public ICollection<Document> Documents { get; set; } = new List<Document>();
     }
 }

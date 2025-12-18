@@ -8,11 +8,9 @@ namespace DocAssistant.Gateway.Data.Models
         [Key]
         public Guid Id { get; set; } = Guid.NewGuid();
 
-        // Links to the Chat Room (not the file directly)
+        [Required]
+        [ForeignKey(nameof(Chat))]
         public Guid ChatId { get; set; }
-
-        [ForeignKey("ChatId")]
-        public Chat? Chat { get; set; }
 
         [Required]
         [MaxLength(20)]
@@ -22,5 +20,8 @@ namespace DocAssistant.Gateway.Data.Models
         public string Content { get; set; } = string.Empty;
 
         public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+
+        // Navigation property
+        public Chat Chat { get; set; } = null!;
     }
 }

@@ -1,5 +1,4 @@
-﻿using DocAssistant.Gateway.Dtos.Chat;
-using DocAssistant.Gateway.Services;
+﻿using DocAssistant.Gateway.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,8 +13,24 @@ namespace DocAssistant.Gateway.Controllers
         //File types allowed to upload
         private readonly string[] _allowedExtensions = { ".pdf" };
 
+        [HttpGet]
+        public async Task<IActionResult> GetAll()
+        {
+            var chats = await chatService.GetAllAsync();
+            return Ok(chats);
+        }
+
+
+        [HttpGet("{chatId:Guid}")]
+        public async Task<IActionResult> GetById([FromRoute] Guid chatId)
+        {
+            var chat = await chatService.GetByIdAsync(chatId);
+
+            return chat == null ? NotFound("Chat cannot found") : Ok(chat);
+        }
+
         [HttpPost]
-        public async Task<IActionResult> CreateChat([FromForm] CreateChatRequest request)
+        public async Task<IActionResult> CreateChat([FromForm] string chatName)
         {
 
             /* TODO: Implement this scenario:
@@ -30,25 +45,10 @@ namespace DocAssistant.Gateway.Controllers
              * Based on last file status, frontend updates state
              * **/
 
-            // 1. Input Validation (Controller's Job)
-            if (request.Files == null || request.Files.Count == 0)
-            {
-                return BadRequest("At least one PDF file is required.");
-            }
-
-            foreach (var file in request.Files)
-            {
-                if (!_allowedExtensions.Contains(Path.GetExtension(file.FileName).ToLower()))
-                    return BadRequest($"File '{file.FileName}' is not allowed.");
-            }
-
             try
             {
-                // 2. Delegate to Service (The Heavy Lifting)
-                //TODO: Fix the file name (it sees id as name)
-                var chat = await chatService.CreateChatAsync(request);
+                var chat = await chatService.CreateChatAsync(chatName);
 
-                // 3. Return Success
                 return Ok(new
                 {
                     ChatId = chat.Id,
@@ -63,6 +63,44 @@ namespace DocAssistant.Gateway.Controllers
                 // Return 500 Internal Server Error
                 return StatusCode(500, "An error occurred while creating the chat. Please try again.");
             }
+        }
+
+        [HttpPost("{chatId:Guid}/files")]
+        public async Task<IActionResult> AddFiles([FromBody] List<IFormFile> files,
+            [FromRoute] Guid chatId)
+        {
+            // 1. Input Validation (Controller's Job)
+            if (files == null || files.Count == 0)
+            {
+                return BadRequest("At least one PDF file is required.");
+            }
+
+            foreach (var file in files)
+            {
+                if (!_allowedExtensions.Contains(Path.GetExtension(file.FileName).ToLower()))
+                    return BadRequest($"File '{file.FileName}' is not allowed.");
+            }
+
+            try
+            {
+                await chatService.UploadFilesAsync(chatId, files);
+                return Accepted();
+            }
+            catch (Exception ex)
+            {
+                // Log the generic error here (Specific errors were logged in the Service)
+                logger.LogError(ex, "Error in UploadFile endpoint");
+                // Return 500 Internal Server Error
+                return StatusCode(500, "An error occurred while creating the chat. Please try again.");
+            }
+        }
+
+        [HttpPost("{chatId:Guid}/message")]
+        public async Task<IActionResult> PostMessage([FromBody] string message, [FromRoute] Guid chatId)
+        {
+            // TODO: Implement message posting logic
+
+            return Ok();
         }
 
         [HttpDelete]

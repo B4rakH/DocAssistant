@@ -1,9 +1,11 @@
+using DocAssistant.Gateway.Common;
 using DocAssistant.Gateway.Data;
 using DocAssistant.Gateway.Repositories;
 using DocAssistant.Gateway.Services;
 using DotNetEnv;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
+using System.Threading.RateLimiting;
 
 namespace DocAssistant.Gateway
 {
@@ -39,7 +41,7 @@ namespace DocAssistant.Gateway
                     cfg.UseRawJsonDeserializer();
 
                     
-                    cfg.ReceiveEndpoint("documents.results", e =>
+                    cfg.ReceiveEndpoint(QueueNames.fileUploadResultQueue, e =>
                     {
                         e.ConfigureConsumer<DocumentResultConsumer>(context);
 

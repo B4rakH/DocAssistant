@@ -29,8 +29,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Constracts\" />
-    <Folder Include="Migrations\" />
+    <Folder Include="Dtos\Chat\" />
   </ItemGroup>
 
 </Project>
