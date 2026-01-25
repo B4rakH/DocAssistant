@@ -1,0 +1,103 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+venv/
+env/
+ENV/
+.venv/
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# PyCharm
+.idea/
+
+# AI Models (Large Files)
+models/
+*.bin
+*.gguf
+*.safetensors
+*.pt
+*.pth
+*.onnx
+*.h5
+*.pkl
+*.model
+
+# Logs
+logs/
+*.log
+log.txt
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary Files
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+
+# OS
+Thumbs.db
+.DS_Store
+*.cache
+
+# Uploaded Files (Test)
+uploaded_test_files/*
+!uploaded_test_files/.gitkeep
+
+# RabbitMQ
+rabbitmq/
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+
+# Qdrant Data
+qdrant_data/
+qdrant_storage/

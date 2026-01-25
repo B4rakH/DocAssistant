@@ -66,7 +66,7 @@ namespace DocAssistant.Gateway.Controllers
         }
 
         [HttpPost("{chatId:Guid}/files")]
-        public async Task<IActionResult> AddFiles([FromBody] List<IFormFile> files,
+        public async Task<IActionResult> UploadFiles([FromForm] List<IFormFile> files,
             [FromRoute] Guid chatId)
         {
             // 1. Input Validation (Controller's Job)

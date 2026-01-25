@@ -1,20 +1,2 @@
 @DocAssistant.Gateway_HostAddress = http://localhost:5010
 
-### Create Chat test with PDF Upload (uploaded_files/sample.pdf)
-POST {{DocAssistant.Gateway_HostAddress}}/api/chat
-Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
-
-------WebKitFormBoundary7MA4YWxkTrZu0gW
-Content-Disposition: form-data; name="Name"
-
-My Test Chat
-------WebKitFormBoundary7MA4YWxkTrZu0gW
-Content-Disposition: form-data; name="Files"; filename="sample.pdf"
-Content-Type: application/pdf
-
-< ./uploaded_files/sample.pdf
-------WebKitFormBoundary7MA4YWxkTrZu0gW--
-
-###
-
-# Response

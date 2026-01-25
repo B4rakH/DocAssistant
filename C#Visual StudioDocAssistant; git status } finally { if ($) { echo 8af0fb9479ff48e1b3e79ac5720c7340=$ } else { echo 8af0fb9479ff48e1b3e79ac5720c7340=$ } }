@@ -1,0 +1,5 @@
+[33mdc637c1[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m add(ai-service): Initial Commit
+[33m4924715[m[33m ([m[1;31morigin/main[m[33m)[m fix(gateway): Clear removed components on project
+[33m8d7d9a2[m feat(gateway): Optimize file upload with batch operations and proper transaction handling feat(gateway): Refactor UploadFilesAsync to use database transactions with batch saves feat(gateway): Add RabbitMQException for proper error handling and file cleanup logic change(gateway) :Remove ChatDocument junction table, implement direct Chat-Document relationship change(gateway): Remove ChatMessageService and ChatMessageController (consolidated into ChatService) fix(gateway): Update EF Core relationships with cascade deletes and performance indexes fix(gateway): Optimize file I/O with larger buffers (80KB) and async streams remove(gateway): Unit tests removed (will be rewritten)
+[33m4d909fc[m feat(gateway): Update DTO as records fix(gateway): Abstract functions with Mappers, Services and Repositories
+[33m007cce2[m feat: Replace RabbitMQService with MassTransit

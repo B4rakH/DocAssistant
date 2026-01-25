@@ -1,9 +1,15 @@
-﻿namespace DocAssistant.Gateway.Dtos.Events
+﻿using System.Text.Json.Serialization;
+
+namespace DocAssistant.Gateway.Dtos.Events;
+
+public record DocumentProcessedEvent
 {
-    public record DocumentProcessedEvent
-    {
-        public Guid DocumentId { get; set; }
-        public bool Success { get; set; }
-        public string? ErrorMessage { get; set; } // If it exists
-    }
+    [JsonPropertyName("document_id")]
+    public Guid DocumentId { get; set; }
+
+    [JsonPropertyName("success")]
+    public bool Success { get; set; }
+
+    [JsonPropertyName("error_message")]
+    public string? ErrorMessage { get; set; }
 }

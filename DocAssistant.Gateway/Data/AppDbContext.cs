@@ -17,6 +17,19 @@ namespace DocAssistant.Gateway.Data
         {
             base.OnModelCreating(modelBuilder);
 
+            // Configure Guid primary keys to be client-generated (not database-generated)
+            modelBuilder.Entity<Document>()
+                .Property(d => d.Id)
+                .ValueGeneratedOnAdd();
+
+            modelBuilder.Entity<Chat>()
+                .Property(c => c.Id)
+                .ValueGeneratedOnAdd();
+
+            modelBuilder.Entity<ChatMessage>()
+                .Property(m => m.Id)
+                .ValueGeneratedOnAdd();
+
             // Configure Document -> Chat relationship (Cascade Delete)
             modelBuilder.Entity<Models.Document>()
                 .HasOne(d => d.Chat)
