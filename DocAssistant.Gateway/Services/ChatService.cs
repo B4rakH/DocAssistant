@@ -17,7 +17,8 @@ namespace DocAssistant.Gateway.Services
         IChatRepository chatRepository,
         IDocumentRepository documentRepository,
         ILogger<ChatService> logger,
-        ISendEndpointProvider endpointProvider) : IChatService
+        ISendEndpointProvider endpointProvider,
+        IMinioService minioService) : IChatService
     {
         public async Task<Chat> CreateChatAsync(string chatName)
         {
@@ -38,27 +39,30 @@ namespace DocAssistant.Gateway.Services
         {
             /**
              * Scenario:
-             * 1. SAVE FILES FIRST (No Transaction)
-             *    - Save files to uploaded_files folder
-             *    - Store file paths in memory
-             *    - If file save fails, cleanup and return error
+             * 1. VALIDATE CHAT EXISTS
+             *    - Check if chat exists before processing files
 
-             * 2. DATABASE TRANSACTION (Fast Operations Only)
+             * 2. UPLOAD FILES TO MINIO (No Transaction)
+             *    - Upload files to MinIO object storage
+             *    - Store object names in memory
+             *    - If upload fails, cleanup uploaded objects and return error
+
+             * 3. DATABASE TRANSACTION (Fast Operations Only)
              *    - Create document records (status: Pending)
              *    - Commit transaction
 
-             * 3. PUBLISH TO RABBITMQ (After Commit)
+             * 4. PUBLISH TO RABBITMQ (After Commit)
              *    - Send documents as batch or individually
              *    - Use Outbox Pattern for reliability (optional but recommended)
 
-             * 4. CONSUMER PROCESSES (Separate Service)
-             *    - AI Service processes files
-             *    - Sends result back via RabbitMQ
+             * 5. CONSUMER PROCESSES (Separate Service)
+             *    - AI Service downloads files from MinIO using object path
+             *    - Processes files and sends result back via RabbitMQ
              *    - DocumentResultConsumer updates status
              *    - Enable retry mechanism with exponential backoff
 
-             * 5. CLEANUP ON FAILURE
-             *    - If transaction fails: delete uploaded files
+             * 6. CLEANUP ON FAILURE
+             *    - If transaction fails: delete uploaded MinIO objects
              *    - If RabbitMQ fails: log error, documents stay in Pending
              *    - Background job can retry pending documents
              */
@@ -68,35 +72,21 @@ namespace DocAssistant.Gateway.Services
             if (!chatExists)
                 throw new InvalidOperationException($"Chat with ID {chatId} not found");
 
-            var uploadsFolder = FolderPath.GetUploadsFolder();
-
             var documentsToProcess = new List<Document>();
-            var savedFilePaths = new List<string>();
+            var uploadedObjectNames = new List<string>();
 
             try
             {
-                // Save files
-                var fileMetadata = new List<(IFormFile file, string filePath)>(files.Count);
+                // Upload files to MinIO
+                var fileMetadata = new List<(IFormFile file, string objectPath)>(files.Count);
 
                 foreach (var file in files)
                 {
-                    var safeFileName = $"{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
-                    var filePath = Path.Combine(uploadsFolder, safeFileName);
+                    var objectName = $"{chatId}/{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
+                    var objectPath = await minioService.UploadFileAsync(file, objectName);
 
-                    // Using larger buffer for better performance
-                    await using (var stream = new FileStream(
-                        filePath,
-                        FileMode.Create,
-                        FileAccess.Write,
-                        FileShare.None,
-                        bufferSize: 81920,
-                        useAsync: true))
-                    {
-                        await file.CopyToAsync(stream);
-                    }
-
-                    fileMetadata.Add((file, filePath));
-                    savedFilePaths.Add(filePath);
+                    fileMetadata.Add((file, objectPath));
+                    uploadedObjectNames.Add(objectName);
                 }
 
                 using var transaction = await context.Database.BeginTransactionAsync();
@@ -104,14 +94,14 @@ namespace DocAssistant.Gateway.Services
                 {
                     // Process database operations in batch
                     
-                    foreach (var (file, filePath) in fileMetadata)
+                    foreach (var (file, objectPath) in fileMetadata)
                     {
-                        // TODO: Fix unnecessary mapping
+                        // TODO: Fix unnecessary mapping (map to DocumentUploadedEvent directly)
                         var document = await documentRepository.CreateAsync(new CreateDocumentDto
                         {
                             ChatId = chatId,
                             File = file,
-                            FilePath = filePath
+                            FilePath = objectPath
                         }, isTransaction: true);
 
                         documentsToProcess.Add(document);
@@ -127,7 +117,7 @@ namespace DocAssistant.Gateway.Services
                     await transaction.RollbackAsync();
                     logger.LogError(ex, "Database transaction failed for chat {ChatId}. Rolling back.", chatId);
 
-                    // Re-throw to outer catch for file cleanup
+                    // Re-throw to outer catch for MinIO cleanup
                     throw;
                 }
 
@@ -139,8 +129,8 @@ namespace DocAssistant.Gateway.Services
                 logger.LogError(ex, "Failed to upload files for chat {ChatId}", chatId);
 
                 if (ex is not RabbitMQException)
-                    // Cleanup uploaded files on any failure
-                    CleanupFiles(savedFilePaths);
+                    // Cleanup uploaded files from MinIO on any failure
+                    await CleanupMinioFilesAsync(uploadedObjectNames);
 
                 throw;
             }
@@ -195,21 +185,20 @@ namespace DocAssistant.Gateway.Services
             }
         }
 
-        private void CleanupFiles(List<string> filePaths)
+        private async Task CleanupMinioFilesAsync(List<string> objectNames)
         {
-            // Delete files during rollback
-            foreach (var path in filePaths)
+            // Delete files from MinIO during rollback
+            if (objectNames.Count == 0)
+                return;
+
+            try
             {
-                try
-                {
-                    if (File.Exists(path))
-                        File.Delete(path);
-                }
-                catch (Exception ex)
-                {
-                    // Just log, don't crash.
-                    logger.LogWarning(ex, $"Failed to delete file during rollback: {path}");
-                }
+                await minioService.DeleteFilesAsync(objectNames);
+            }
+            catch (Exception ex)
+            {
+                // Just log, don't crash.
+                logger.LogWarning(ex, "Failed to cleanup {Count} files from MinIO during rollback", objectNames.Count);
             }
         }
     }

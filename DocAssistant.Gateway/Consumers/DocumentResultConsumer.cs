@@ -16,7 +16,7 @@ namespace DocAssistant.Gateway.Consumers
 
                 var newStatus = message.Success ? DocumentStatus.Completed : DocumentStatus.Failed;
 
-                // TODO: Opitimize management of the onFail case (Delete failed files in the disk)
+                // TODO: Optimize management of the onFail case (Delete failed files in the disk)
 
                 Console.WriteLine($"DocumentId: {message.DocumentId} Success:{message.Success}");
 

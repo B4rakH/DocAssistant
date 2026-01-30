@@ -6,7 +6,10 @@ public record DocumentUploadedEvent
 {
     [JsonPropertyName("document_id")]
     public Guid DocumentId { get; set; }
-    
+
+    [JsonPropertyName("chat_id")]
+    public Guid ChatId { get; set; }
+
     [JsonPropertyName("file_path")]
     public string FilePath { get; set; } = null!;
     

@@ -1,5 +1,6 @@
 ﻿namespace DocAssistant.Gateway.Common
 {
+    [Obsolete("Local file storage is deprecated. Use IMinioService for object storage instead.")]
     public static class FolderPath
     {
         public static string GetUploadsFolder()

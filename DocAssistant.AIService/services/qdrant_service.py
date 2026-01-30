@@ -3,13 +3,16 @@ from typing import List, Dict, Optional
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
 import uuid
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class QdrantService:
     
     def __init__(self, host: str = "localhost", port: int = 6333):
         
-        print("Initializing Qdrant Service...")
+        logger.info("Initializing Qdrant Service...")
         
         self.host = host
         self.port = port
@@ -18,12 +21,12 @@ class QdrantService:
         # Connect to Qdrant
         self._connect()
         
-        print("Qdrant Service initialized\n")
+        logger.info("Qdrant Service initialized")
     
     def _connect(self):
 
         try:
-            print(f"   Connecting to Qdrant at {self.host}:{self.port}")
+            logger.info(f"Connecting to Qdrant at {self.host}:{self.port}")
             
             # Create Qdrant client
             self.client = QdrantClient(
@@ -33,12 +36,12 @@ class QdrantService:
             
             # Test connection by getting server info
             info = self.client.get_collections()
-            print(f"   Connected successfully")
-            print(f"   Existing collections: {len(info.collections)}")
+            logger.info(f"Connected successfully")
+            logger.info(f"Existing collections: {len(info.collections)}")
             
         except Exception as e:
-            print(f"   ERROR: Failed to connect to Qdrant: {e}")
-            print(f"   Make sure Qdrant is running: docker ps")
+            logger.error(f"Failed to connect to Qdrant: {e}")
+            logger.error(f"Make sure Qdrant is running: docker ps")
             raise
     
     def health_check(self) -> bool:
@@ -47,7 +50,7 @@ class QdrantService:
             self.client.get_collections()
             return True
         except Exception as e:
-            print(f"Health check failed: {e}")
+            logger.error(f"Health check failed: {e}")
             return False
     
     def create_collection(self, collection_name: str, vector_size: int = 384):
@@ -58,11 +61,11 @@ class QdrantService:
             existing_names = [col.name for col in collections]
             
             if collection_name in existing_names:
-                print(f"   Collection '{collection_name}' already exists")
+                logger.info(f"Collection '{collection_name}' already exists")
                 return
             
-            print(f"Creating collection: {collection_name}")
-            print(f"   Vector size: {vector_size}")
+            logger.info(f"Creating collection: {collection_name}")
+            logger.info(f"Vector size: {vector_size}")
             
             # Create collection with configuration
             self.client.create_collection(
@@ -73,10 +76,10 @@ class QdrantService:
                 )
             )
             
-            print(f"   Collection created successfully")
+            logger.info(f"Collection created successfully")
             
         except Exception as e:
-            print(f"   ERROR: Failed to create collection: {e}")
+            logger.error(f"Failed to create collection: {e}")
             raise
     
     def collection_exists(self, collection_name: str) -> bool:
@@ -86,22 +89,22 @@ class QdrantService:
             existing_names = [col.name for col in collections]
             return collection_name in existing_names
         except Exception as e:
-            print(f"Error checking collection: {e}")
+            logger.error(f"Error checking collection: {e}")
             return False
     
     def delete_collection(self, collection_name: str):
         
         try:
             if not self.collection_exists(collection_name):
-                print(f"   Collection '{collection_name}' does not exist")
+                logger.warning(f"Collection '{collection_name}' does not exist")
                 return
             
-            print(f"Deleting collection: {collection_name}")
+            logger.info(f"Deleting collection: {collection_name}")
             self.client.delete_collection(collection_name)
-            print(f"   Collection deleted")
+            logger.info(f"Collection deleted")
             
         except Exception as e:
-            print(f"   ERROR: Failed to delete collection: {e}")
+            logger.error(f"Failed to delete collection: {e}")
             raise
     
     def store_document_chunks(self, collection_name: str, document_id: str, chunks: List[Dict]):
@@ -113,11 +116,11 @@ class QdrantService:
         """
         try:
             if not self.collection_exists(collection_name):
-                print(f"   ERROR: Collection '{collection_name}' does not exist")
-                print(f"   Create it first with create_collection()")
+                logger.error(f"Collection '{collection_name}' does not exist")
+                logger.error(f"Create it first with create_collection()")
                 raise ValueError(f"Collection {collection_name} not found")
             
-            print(f"Storing {len(chunks)} chunks for document {document_id}")
+            logger.info(f"Storing {len(chunks)} chunks for document {document_id}")
             
             # Prepare points for Qdrant
             points = []
@@ -148,10 +151,10 @@ class QdrantService:
                 points=points
             )
             
-            print(f"   Stored {len(points)} chunks successfully")
+            logger.info(f"Stored {len(points)} chunks successfully")
             
         except Exception as e:
-            print(f"   ERROR: Failed to store chunks: {e}")
+            logger.error(f"Failed to store chunks: {e}")
             raise
     
     def get_collection_info(self, collection_name: str) -> Dict:
@@ -176,7 +179,7 @@ class QdrantService:
             }
             
         except Exception as e:
-            print(f"Error getting collection info: {e}")
+            logger.error(f"Error getting collection info: {e}")
             return None
     
     def search_similar_chunks(self, collection_name: str, query_vector: List[float], 
@@ -184,10 +187,10 @@ class QdrantService:
 
         try:
             if not self.collection_exists(collection_name):
-                print(f"   ERROR: Collection '{collection_name}' does not exist")
+                logger.error(f"Collection '{collection_name}' does not exist")
                 return []
             
-            print(f"Searching for top {limit} similar chunks...")
+            logger.info(f"Searching for top {limit} similar chunks...")
             
             # Build filter if searching specific document
             search_filter = None
@@ -223,11 +226,11 @@ class QdrantService:
                     'end_pos': result.payload.get('end_pos')
                 })
             
-            print(f"   Found {len(formatted_results)} results")
+            logger.info(f"Found {len(formatted_results)} results")
             return formatted_results
             
         except Exception as e:
-            print(f"   ERROR: Search failed: {e}")
+            logger.error(f"Search failed: {e}")
             raise
 
 

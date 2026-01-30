@@ -78,6 +78,7 @@ htmlcov/
 # Temporary Files
 tmp/
 temp/
+temp_downloads/
 *.tmp
 *.bak
 *.swp

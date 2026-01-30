@@ -8,6 +8,9 @@ from typing import List, Dict, Optional
 import pdfplumber
 from PyPDF2 import PdfReader
 from sentence_transformers import SentenceTransformer
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class AIService:
@@ -22,7 +25,7 @@ class AIService:
         Args:
             embedding_model_name: Name of the embedding model to use
         """
-        print("Initializing AI Service...")
+        logger.info("Initializing AI Service...")
         
         # Chunking configuration
         self.chunk_size = 1000  # Characters per chunk
@@ -33,7 +36,7 @@ class AIService:
         self.embedding_model = None
         self._load_embedding_model()
         
-        print("AI Service initialized\n")
+        logger.info("AI Service initialized")
     
     def _load_embedding_model(self):
         """
@@ -43,18 +46,18 @@ class AIService:
         that can be stored and searched in a vector database.
         """
         try:
-            print(f"   Loading embedding model: {self.embedding_model_name}")
+            logger.info(f"Loading embedding model: {self.embedding_model_name}")
             
             # Load the model
             self.embedding_model = SentenceTransformer(self.embedding_model_name)
             
             # Get model info
             embedding_dim = self.embedding_model.get_sentence_embedding_dimension()
-            print(f"   Model loaded successfully")
-            print(f"   Embedding dimension: {embedding_dim}")
+            logger.info(f"Model loaded successfully")
+            logger.info(f"Embedding dimension: {embedding_dim}")
             
         except Exception as e:
-            print(f"   ERROR: Failed to load embedding model: {e}")
+            logger.error(f"Failed to load embedding model: {e}")
             raise
         
     
@@ -77,7 +80,7 @@ class AIService:
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"PDF file not found: {file_path}")
         
-        print(f"Extracting text from: {os.path.basename(file_path)}")
+        logger.info(f"Extracting text from: {os.path.basename(file_path)}")
         
         text = ""
         
@@ -85,19 +88,19 @@ class AIService:
         try:
             text = self._extract_with_pdfplumber(file_path)
             if text.strip():
-                print(f"   Extracted {len(text)} characters using pdfplumber")
+                logger.info(f"Extracted {len(text)} characters using pdfplumber")
                 return text
         except Exception as e:
-            print(f"   WARNING: pdfplumber failed: {e}")
+            logger.warning(f"pdfplumber failed: {e}")
         
         # Step 3: Fallback to PyPDF2
         try:
             text = self._extract_with_pypdf2(file_path)
             if text.strip():
-                print(f"   Extracted {len(text)} characters using PyPDF2")
+                logger.info(f"Extracted {len(text)} characters using PyPDF2")
                 return text
         except Exception as e:
-            print(f"   ERROR: PyPDF2 also failed: {e}")
+            logger.error(f"PyPDF2 also failed: {e}")
             raise Exception("Failed to extract text from PDF")
         
         if not text.strip():
@@ -140,7 +143,7 @@ class AIService:
         Returns:
             List of chunks with metadata
         """
-        print(f"Chunking text ({len(text)} characters)...")
+        logger.info(f"Chunking text ({len(text)} characters)...")
         
         # Clean the text first
         text = text.strip()
@@ -174,7 +177,7 @@ class AIService:
             # Move start position (with overlap)
             start += (self.chunk_size - self.chunk_overlap)
         
-        print(f"   Created {len(chunks)} chunks")
+        logger.info(f"Created {len(chunks)} chunks")
         return chunks
     
     def generate_embeddings(self, chunks: List[Dict[str, any]]) -> List[Dict[str, any]]:
@@ -192,10 +195,10 @@ class AIService:
         """
         
         if not chunks:
-            print("No chunks to embed")
+            logger.warning("No chunks to embed")
             return []
         
-        print(f"Generating embeddings for {len(chunks)} chunks...")
+        logger.info(f"Generating embeddings for {len(chunks)} chunks...")
         
         # Extract just the text from chunks
         texts = [chunk['text'] for chunk in chunks]
@@ -212,7 +215,7 @@ class AIService:
             chunk['embedding'] = embeddings[i].tolist()  # Convert numpy array to list
             chunk['embedding_dim'] = len(embeddings[i])
         
-        print(f"   Embeddings generated (dimension: {len(embeddings[0])})")
+        logger.info(f"Embeddings generated (dimension: {len(embeddings[0])})")
         return chunks
 
 

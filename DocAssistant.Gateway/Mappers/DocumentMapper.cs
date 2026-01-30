@@ -23,6 +23,7 @@ namespace DocAssistant.Gateway.Mappers
         {
             return new DocumentUploadedEvent
             {
+                ChatId = document.ChatId,
                 DocumentId = document.Id,
                 FilePath = document.FilePath,
                 FileSize = document.FileSize,

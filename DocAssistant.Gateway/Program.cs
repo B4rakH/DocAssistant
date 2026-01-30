@@ -11,7 +11,7 @@ namespace DocAssistant.Gateway
 {
     public class Program
     {
-        public static void Main(string[] args)
+        public static async Task Main(string[] args)
         {
 
             Env.Load();
@@ -24,6 +24,7 @@ namespace DocAssistant.Gateway
 
             // Add services to the container.
             builder.Services.AddScoped<IChatService, ChatService>();
+            builder.Services.AddSingleton<IMinioService, MinioService>();
 
             builder.Services.AddMassTransit(x =>
             {
@@ -59,6 +60,13 @@ namespace DocAssistant.Gateway
             builder.Services.AddSwaggerGen();
 
             var app = builder.Build();
+
+            // Ensure MinIO bucket exists
+            using (var scope = app.Services.CreateScope())
+            {
+                var minioService = scope.ServiceProvider.GetRequiredService<IMinioService>();
+                await minioService.EnsureBucketExistsAsync();
+            }
 
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
