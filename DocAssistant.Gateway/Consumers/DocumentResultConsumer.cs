@@ -1,14 +1,17 @@
 using DocAssistant.Gateway.Common.Enums;
 using DocAssistant.Gateway.Dtos.Events;
+using DocAssistant.Gateway.Hubs;
 using DocAssistant.Gateway.Repositories;
 using DocAssistant.Gateway.Services;
 using MassTransit;
+using Microsoft.AspNetCore.SignalR;
 
 namespace DocAssistant.Gateway.Consumers
 {
     public class DocumentResultConsumer(
         IDocumentRepository documentRepository,
         IMinIOService minioService,
+        IHubContext<ChatHub> hubContext,
         ILogger<DocumentResultConsumer> logger) : IConsumer<DocumentProcessedEvent>
     {
         public async Task Consume(ConsumeContext<DocumentProcessedEvent> context)
@@ -32,6 +35,9 @@ namespace DocAssistant.Gateway.Consumers
                     return;
                 }
 
+                // Load document before updating (need chatId for SignalR notification)
+                var document = await documentRepository.GetByIdAsync(message.DocumentId, context.CancellationToken);
+
                 // Update successful document status
                 var updated = await documentRepository.UpdateStatusAsync(
                     message.DocumentId,
@@ -49,12 +55,8 @@ namespace DocAssistant.Gateway.Consumers
 
                 logger.LogInformation("Document {DocumentId} updated to {Status}", message.DocumentId, newStatus);
 
-                // TODO: Notify user via SignalR
-                // await _hubContext.Clients.User(userId)
-                //     .SendAsync("DocumentProcessed", new { 
-                //         id = message.DocumentId, 
-                //         status = "Completed"
-                //     });
+                // Notify connected clients about document completion
+                await NotifyDocumentStatusAsync(document?.ChatId, message.DocumentId, "Completed", document?.FileName);
             }
             catch (Exception ex)
             {
@@ -130,12 +132,8 @@ namespace DocAssistant.Gateway.Consumers
                     "Cleanup completed for failed document {DocumentId}",
                     documentId);
 
-                // TODO: Notify user via SignalR about processing failure
-                // await _hubContext.Clients.User(userId)
-                //     .SendAsync("DocumentProcessingFailed", new { 
-                //         id = documentId, 
-                //         error = errorMessage
-                //     });
+                // Notify connected clients about document failure
+                await NotifyDocumentStatusAsync(document.ChatId, documentId, "Failed", document.FileName, errorMessage);
             }
             catch (Exception ex)
             {
@@ -146,6 +144,27 @@ namespace DocAssistant.Gateway.Consumers
             }
         }
 
+        // Best-effort SignalR notification — never crashes the consumer
+        private async Task NotifyDocumentStatusAsync(Guid? chatId, Guid documentId, string status, string? fileName, string? error = null)
+        {
+            if (chatId == null) return;
+
+            try
+            {
+                await hubContext.Clients.Group(chatId.ToString()!)
+                    .SendAsync("DocumentStatusChanged", new
+                    {
+                        DocumentId = documentId,
+                        ChatId = chatId,
+                        Status = status,
+                        FileName = fileName,
+                        Error = error
+                    });
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to send SignalR notification for document {DocumentId}", documentId);
+            }
         }
     }
 }

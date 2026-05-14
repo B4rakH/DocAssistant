@@ -1,6 +1,7 @@
 using DocAssistant.Gateway.Common;
 using DocAssistant.Gateway.Consumers;
 using DocAssistant.Gateway.Data;
+using DocAssistant.Gateway.Hubs;
 using DocAssistant.Gateway.Repositories;
 using DocAssistant.Gateway.Services;
 using DotNetEnv;
@@ -26,6 +27,7 @@ namespace DocAssistant.Gateway
             // Add services to the container.
             builder.Services.AddScoped<IChatService, ChatService>();
             builder.Services.AddSingleton<IMinIOService, MinIOService>();
+            builder.Services.AddSignalR();
 
             builder.Services.AddMassTransit(x =>
             {
@@ -90,6 +92,7 @@ namespace DocAssistant.Gateway
 
 
             app.MapControllers();
+            app.MapHub<ChatHub>("/chatHub");
 
             app.Run();
         }

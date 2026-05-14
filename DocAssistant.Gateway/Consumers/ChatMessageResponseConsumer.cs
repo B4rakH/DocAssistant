@@ -1,13 +1,16 @@
 using DocAssistant.Gateway.Common.Enums;
 using DocAssistant.Gateway.Data.Models;
 using DocAssistant.Gateway.Dtos.Events;
+using DocAssistant.Gateway.Hubs;
 using DocAssistant.Gateway.Repositories;
 using MassTransit;
+using Microsoft.AspNetCore.SignalR;
 
 namespace DocAssistant.Gateway.Consumers
 {
     public class ChatMessageResponseConsumer(
         IChatMessageRepository chatMessageRepository,
+        IHubContext<ChatHub> hubContext,
         ILogger<ChatMessageResponseConsumer> logger) : IConsumer<ChatMessageResponseEvent>
     {
         public async Task Consume(ConsumeContext<ChatMessageResponseEvent> context)
@@ -31,7 +34,15 @@ namespace DocAssistant.Gateway.Consumers
                         response.ChatId,
                         response.ErrorMessage);
 
-                    // TODO: Notify user via SignalR about the error
+                    // Notify user about AI failure in real-time
+                    await SendMessageToClientAsync(response.ChatId, new
+                    {
+                        ChatId = response.ChatId,
+                        Content = "Sorry, an error occurred while processing your question. Please try again.",
+                        Role = MessageRole.Assistant,
+                        IsError = true,
+                        Timestamp = DateTime.UtcNow
+                    });
                     return;
                 }
 
@@ -64,16 +75,16 @@ namespace DocAssistant.Gateway.Consumers
                     aiMessage.Id,
                     response.ChatId);
 
-                // TODO: Send real-time notification via SignalR
-                // await hubContext.Clients.Group(response.ChatId.ToString())
-                //     .SendAsync("ReceiveMessage", new {
-                //         messageId = aiMessage.Id,
-                //         chatId = response.ChatId,
-                //         content = aiMessage.Content,
-                //         role = MessageRole.Assistant,
-                //         confidenceScore = response.ConfidenceScore,
-                //         timestamp = aiMessage.Timestamp
-                //     });
+                // Push AI response to connected clients in real-time
+                await SendMessageToClientAsync(response.ChatId, new
+                {
+                    MessageId = aiMessage.Id,
+                    ChatId = response.ChatId,
+                    Content = aiMessage.Content,
+                    Role = MessageRole.Assistant,
+                    ConfidenceScore = response.ConfidenceScore,
+                    Timestamp = aiMessage.Timestamp
+                });
             }
             catch (Exception ex)
             {
@@ -87,6 +98,18 @@ namespace DocAssistant.Gateway.Consumers
                 throw;
             }
         }
+        // Best-effort SignalR notification — never crashes the consumer
+        private async Task SendMessageToClientAsync(Guid chatId, object payload)
+        {
+            try
+            {
+                await hubContext.Clients.Group(chatId.ToString())
+                    .SendAsync("ReceiveMessage", payload);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to send SignalR notification for chat {ChatId}", chatId);
+            }
         }
     }
 }
