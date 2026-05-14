@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DocumentProcessedEvent",
+  "description": "Sent by AIService after processing a document (success or failure).",
+  "type": "object",
+  "properties": {
+    "document_id": { "type": "string", "format": "uuid" },
+    "success": { "type": "boolean" },
+    "error_message": { "type": ["string", "null"] }
+  },
+  "required": ["document_id", "success"]
+}

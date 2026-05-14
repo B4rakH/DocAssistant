@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ChatMessageSentEvent",
+  "description": "Sent by Gateway when a user posts a chat message for AI processing.",
+  "type": "object",
+  "properties": {
+    "chat_id": { "type": "string", "format": "uuid" },
+    "message_id": { "type": "string", "format": "uuid" },
+    "content": { "type": "string" },
+    "timestamp": { "type": "string", "format": "date-time" }
+  },
+  "required": ["chat_id", "message_id", "content"]
+}

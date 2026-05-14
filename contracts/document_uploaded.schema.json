@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DocumentUploadedEvent",
+  "description": "Sent by Gateway when a document is uploaded and ready for AI processing.",
+  "type": "object",
+  "properties": {
+    "document_id": { "type": "string", "format": "uuid" },
+    "chat_id": { "type": "string", "format": "uuid" },
+    "file_path": { "type": "string", "description": "MinIO object path" },
+    "file_size": { "type": "integer" },
+    "content_type": { "type": ["string", "null"] }
+  },
+  "required": ["document_id", "chat_id", "file_path"]
+}

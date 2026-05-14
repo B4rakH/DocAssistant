@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "QueueNames",
+  "description": "Shared queue name definitions used by both Gateway and AIService.",
+  "queues": {
+    "document_upload": {
+      "name": "documents.uploaded",
+      "direction": "Gateway → AIService",
+      "event": "DocumentUploadedEvent"
+    },
+    "document_result": {
+      "name": "documents.results",
+      "direction": "AIService → Gateway",
+      "event": "DocumentProcessedEvent"
+    },
+    "chat_message": {
+      "name": "chat.messages.sent",
+      "direction": "Gateway → AIService",
+      "event": "ChatMessageSentEvent"
+    },
+    "chat_message_response": {
+      "name": "chat.messages.responses",
+      "direction": "AIService → Gateway",
+      "event": "ChatMessageResponseEvent"
+    }
+  }
+}

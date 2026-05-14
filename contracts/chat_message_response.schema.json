@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ChatMessageResponseEvent",
+  "description": "Sent by AIService with the AI-generated response to a chat message.",
+  "type": "object",
+  "properties": {
+    "chat_id": { "type": "string", "format": "uuid" },
+    "message_id": { "type": "string", "format": "uuid" },
+    "response": { "type": "string" },
+    "confidence_score": { "type": "number", "default": 0.0 },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "is_success": { "type": "boolean", "default": true },
+    "error_message": { "type": ["string", "null"] }
+  },
+  "required": ["chat_id", "message_id", "response", "is_success"]
+}
