@@ -11,5 +11,10 @@ namespace DocAssistant.Gateway.Repositories
         Task<Chat> CreateAsync(string chatName, bool isTransaction = false);
         Task DeleteAsync(Guid chatId, bool isTransaction = false);
         Task<bool> ExistsByIdAsync(Guid chatId);
+        
+        /// <summary>
+        /// Validates chat existence and document completion status in a single optimized query
+        /// </summary>
+        Task<(bool ChatExists, bool AllDocumentsCompleted)> ValidateChatAndDocumentsAsync(Guid chatId);
     }
 }

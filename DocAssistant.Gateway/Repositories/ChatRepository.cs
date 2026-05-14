@@ -1,4 +1,4 @@
-﻿
+﻿using DocAssistant.Gateway.Common.Enums;
 using DocAssistant.Gateway.Data;
 using DocAssistant.Gateway.Data.Models;
 
@@ -12,12 +12,15 @@ namespace DocAssistant.Gateway.Repositories
         public async Task<List<Chat>> GetAllAsync()
         {
             return await context.Chats
+                .AsNoTracking()
                 .ToListAsync();
         }
 
         public async Task<Chat?> GetByIdAsync(Guid chatId)
         {
             return await context.Chats
+                .AsNoTracking()
+                .Include(c => c.Messages)
                 .FirstOrDefaultAsync(c => c.Id == chatId);
         }
 
@@ -51,7 +54,32 @@ namespace DocAssistant.Gateway.Repositories
 
         public async Task<bool> ExistsByIdAsync(Guid chatId)
         {
-            return await context.Chats.AnyAsync(c => c.Id == chatId);
+            return await context.Chats
+                .AsNoTracking()
+                .AnyAsync(c => c.Id == chatId);
+        }
+
+        public async Task<(bool ChatExists, bool AllDocumentsCompleted)> ValidateChatAndDocumentsAsync(Guid chatId)
+        {
+            var chatData = await context.Chats
+                .AsNoTracking()
+                .Where(c => c.Id == chatId)
+                .Select(c => new
+                {
+                    Exists = true,
+                    HasDocuments = c.Documents.Any(),
+                    AllCompleted = c.Documents.All(d => d.Status == DocumentStatus.Completed)
+                })
+                .FirstOrDefaultAsync();
+
+            if (chatData == null)
+                return (false, false);
+
+            // If chat has no documents, allow chatting (business decision)
+            if (!chatData.HasDocuments)
+                return (true, true);
+
+            return (true, chatData.AllCompleted);
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿using DocAssistant.Gateway.Common;
+using DocAssistant.Gateway.Common;
 using DocAssistant.Gateway.Common.Enums;
 using DocAssistant.Gateway.Data;
 using DocAssistant.Gateway.Data.Models;
@@ -9,16 +9,18 @@ using DocAssistant.Gateway.Exceptions;
 using DocAssistant.Gateway.Mappers;
 using DocAssistant.Gateway.Repositories;
 using MassTransit;
+using Microsoft.EntityFrameworkCore;
 
 namespace DocAssistant.Gateway.Services
 {
     public class ChatService(
         AppDbContext context,
         IChatRepository chatRepository,
+        IChatMessageRepository chatMessageRepository,
         IDocumentRepository documentRepository,
         ILogger<ChatService> logger,
         ISendEndpointProvider endpointProvider,
-        IMinioService minioService) : IChatService
+        IMinIOService minioService) : IChatService
     {
         public async Task<Chat> CreateChatAsync(string chatName)
         {
@@ -136,32 +138,107 @@ namespace DocAssistant.Gateway.Services
             }
         }
 
-        public async Task<ChatMessageResponse> PostMessageAsync(Guid chatId, string message)
+        public async Task<ChatMessageResponse> PostMessageAsync(Guid chatId, ChatMessageRequest request)
         {
-            return null;
-        }
-
-
-        public async Task DeleteChatAsync(Guid chatId)
-        {
-            // TODO: Delete chat with its entities and send message to RabbitMQ
-            // for deleting it on AI service too.
-
             /**
-             * Scenario:
-             * User requests chat deletion
-             * Transaction starts
-             * Delete chat from database
-             * Delete uncascaded entities
-             * Send message to RabbitMQ for AI service to delete chat data
-             * TODO: waiting for confirmation from AI service?
-             * End transaction and save changes
-             * Return Ok
+             * Optimized Flow with Immediate Compensation:
+             * 1. Validate chat exists AND all documents completed (single query)
+             * 2. Save user message to database (fast transaction)
+             * 3. Send to AI service via RabbitMQ (outside transaction)
+             * 4. If RabbitMQ fails: DELETE the message from database (compensation)
+             * 
+             * Benefits:
+             * - Transaction held for <10ms (no network I/O)
+             * - Better scalability
+             * - No database locks during RabbitMQ call
+             * - Maintains consistency: no orphaned messages
+             * 
+             * Trade-off:
+             * - Message is lost if RabbitMQ fails (vs. retrying later)
+             * - User needs to resend the message
              */
 
-            await chatRepository.DeleteAsync(chatId);
+            // 1. Combined validation in single database query (via repository)
+            var validation = await chatRepository.ValidateChatAndDocumentsAsync(chatId);
 
+            if (!validation.ChatExists)
+                throw new InvalidOperationException($"Chat with ID {chatId} not found");
+
+            if (!validation.AllDocumentsCompleted)
+                throw new InvalidOperationException(
+                    "Cannot send message: some documents are still being processed. Please wait until all documents are ready.");
+
+            // 2. Create message entity
+            var userMessage = request.ToModelFromRequest(chatId, MessageRole.User);
+
+            // 3. Save to database in fast transaction (no network I/O)
+            using var transaction = await context.Database.BeginTransactionAsync();
+            
+            try
+            {
+                await chatMessageRepository.CreateAsync(userMessage);
+                await transaction.CommitAsync();
+
+                logger.LogInformation(
+                    "User message {MessageId} saved to database for chat {ChatId}", 
+                    userMessage.Id, chatId);
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                
+                logger.LogError(ex, 
+                    "Failed to save chat message to database for chat {ChatId}. Transaction rolled back.", 
+                    chatId);
+                
+                throw;
+            }
+
+            // 4. Send to AI service via RabbitMQ (outside transaction)
+            try
+            {
+                await SendChatMessageToAIAsync(chatId, userMessage);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, 
+                    "Failed to send message to AI service. MessageId: {MessageId}. Performing compensation: deleting message from database.", 
+                    userMessage.Id);
+                
+                // Immediate Compensation: Delete the orphaned message from database
+                try
+                {
+                    await chatMessageRepository.DeleteAsync(userMessage.Id);
+                    
+                    logger.LogInformation(
+                        "Compensation completed: Deleted message {MessageId} from database after RabbitMQ failure.", 
+                        userMessage.Id);
+                }
+                catch (Exception deleteEx)
+                {
+                    logger.LogCritical(deleteEx, 
+                        "CRITICAL: Failed to delete message {MessageId} during compensation. Manual cleanup required!", 
+                        userMessage.Id);
+                }
+                
+                throw new RabbitMQException(
+                    "Failed to send message to AI service. Your message could not be processed. Please try again.", 
+                    ex);
+            }
+
+            // 5. Return immediately - frontend will receive actual response via SignalR
+            return new ChatMessageResponse
+            {
+                MessageId = userMessage.Id,
+                ChatId = chatId,
+                Content = "Your message is being processed...",
+                Role = MessageRole.Assistant,
+                ConfidenceScore = null,
+                Timestamp = userMessage.Timestamp  // Use message timestamp, not DateTime.UtcNow
+            };
         }
+
+
 
         private async Task SendDocumentAsync(List<Document> documents)
         {
@@ -201,5 +278,34 @@ namespace DocAssistant.Gateway.Services
                 logger.LogWarning(ex, "Failed to cleanup {Count} files from MinIO during rollback", objectNames.Count);
             }
         }
+
+        private async Task SendChatMessageToAIAsync(Guid chatId, ChatMessage userMessage)
+        {
+            try
+            {
+                var endpoint = await endpointProvider.GetSendEndpoint(new Uri($"queue:{QueueNames.chatMessageQueue}"));
+
+                var messageEvent = new ChatMessageSentEvent
+                {
+                    ChatId = chatId,
+                    MessageId = userMessage.Id,
+                    Content = userMessage.Content,
+                    Timestamp = userMessage.Timestamp,
+                    CorrelationId = Guid.NewGuid()
+                };
+
+                await endpoint.Send(messageEvent);
+
+                logger.LogInformation("Sent chat message {MessageId} to AI service for chat {ChatId} [CorrelationId: {CorrelationId}]", 
+                    userMessage.Id, chatId, messageEvent.CorrelationId);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to publish chat message {MessageId} to RabbitMQ", userMessage.Id);
+                throw;
+            }
+        }
+
+
     }
 }

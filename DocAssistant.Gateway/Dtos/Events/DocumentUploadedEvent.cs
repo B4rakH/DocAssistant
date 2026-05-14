@@ -18,4 +18,7 @@ public record DocumentUploadedEvent
     
     [JsonPropertyName("content_type")]
     public string? ContentType { get; set; }
+
+    [JsonPropertyName("correlation_id")]
+    public Guid? CorrelationId { get; set; }
 }

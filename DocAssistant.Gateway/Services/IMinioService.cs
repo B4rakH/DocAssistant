@@ -1,6 +1,6 @@
 namespace DocAssistant.Gateway.Services
 {
-    public interface IMinioService
+    public interface IMinIOService
     {
         /// <summary>
         /// Uploads a file to MinIO bucket

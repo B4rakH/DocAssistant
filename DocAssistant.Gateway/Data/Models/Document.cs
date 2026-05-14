@@ -25,7 +25,7 @@ namespace DocAssistant.Gateway.Data.Models
         [MaxLength(100)]
         public string ContentType { get; set; } = "application/pdf";
 
-        public DocumentStatus Status { get; set; } = DocumentStatus.Loading;
+        public DocumentStatus Status { get; set; } = DocumentStatus.Pending;
 
         public string? FailureReason { get; set; }
 

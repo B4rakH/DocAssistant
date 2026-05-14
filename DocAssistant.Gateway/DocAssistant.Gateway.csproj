@@ -30,7 +30,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Dtos\Chat\" />
+    <Folder Include="Migrations\" />
   </ItemGroup>
 
 </Project>

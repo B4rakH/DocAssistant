@@ -1,11 +1,15 @@
-﻿using DocAssistant.Gateway.Common.Enums;
+using DocAssistant.Gateway.Common.Enums;
 using DocAssistant.Gateway.Dtos.Events;
 using DocAssistant.Gateway.Repositories;
+using DocAssistant.Gateway.Services;
 using MassTransit;
 
 namespace DocAssistant.Gateway.Consumers
 {
-    public class DocumentResultConsumer(IDocumentRepository documentRepository, ILogger<DocumentResultConsumer> logger) : IConsumer<DocumentProcessedEvent>
+    public class DocumentResultConsumer(
+        IDocumentRepository documentRepository,
+        IMinIOService minioService,
+        ILogger<DocumentResultConsumer> logger) : IConsumer<DocumentProcessedEvent>
     {
         public async Task Consume(ConsumeContext<DocumentProcessedEvent> context)
         {
@@ -13,18 +17,27 @@ namespace DocAssistant.Gateway.Consumers
 
             try
             {
-
                 var newStatus = message.Success ? DocumentStatus.Completed : DocumentStatus.Failed;
 
-                // TODO: Optimize management of the onFail case (Delete failed files in the disk)
+                logger.LogInformation(
+                    "Received document processing result for document {DocumentId}. Success: {Success} [CorrelationId: {CorrelationId}]",
+                    message.DocumentId,
+                    message.Success,
+                    message.CorrelationId);
 
-                Console.WriteLine($"DocumentId: {message.DocumentId} Success:{message.Success}");
+                // Handle failed documents: delete from both database and MinIO
+                if (!message.Success)
+                {
+                    await HandleFailedDocumentAsync(message.DocumentId, message.ErrorMessage, context.CancellationToken);
+                    return;
+                }
 
+                // Update successful document status
                 var updated = await documentRepository.UpdateStatusAsync(
-                                        message.DocumentId,
-                                        newStatus,
-                                        message.ErrorMessage,
-                                        context.CancellationToken);
+                    message.DocumentId,
+                    newStatus,
+                    message.ErrorMessage,
+                    context.CancellationToken);
 
                 if (!updated)
                 {
@@ -34,24 +47,105 @@ namespace DocAssistant.Gateway.Consumers
                     return;
                 }
 
-                logger.LogInformation("Document {DocumentId} updated to {newStatus}", message.DocumentId, newStatus);
+                logger.LogInformation("Document {DocumentId} updated to {Status}", message.DocumentId, newStatus);
 
-                // TODO:Notify user via SignalR
-                // 1. Inject IHubContext<NotificationHub> into this Consumer's constructor.
-                // 2. Use 'message.UserId' (Ensure your event includes UserId) to target the specific user.
-                // Example: 
-                //    await _hubContext.Clients.User(message.UserId.ToString())
-                //        .SendAsync("DocumentProcessed", new { 
-                //             id = message.DocumentId, 
-                //             status = newStatus, 
-                //             error = message.ErrorMessage 
-                //        });
+                // TODO: Notify user via SignalR
+                // await _hubContext.Clients.User(userId)
+                //     .SendAsync("DocumentProcessed", new { 
+                //         id = message.DocumentId, 
+                //         status = "Completed"
+                //     });
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error updating document status for {DocumentId}", context.Message.DocumentId);
-                throw; // Re-throw to let MassTransit handle retry
+                logger.LogError(ex,
+                    "Failed to process document result for document {DocumentId} [CorrelationId: {CorrelationId}]",
+                    message.DocumentId,
+                    message.CorrelationId);
+                throw; // Re-throw for MassTransit retry
             }
+        }
+
+        private async Task HandleFailedDocumentAsync(
+            Guid documentId,
+            string? errorMessage,
+            CancellationToken cancellationToken)
+        {
+            logger.LogWarning(
+                "Document {DocumentId} processing failed: {Error}. Starting cleanup...",
+                documentId,
+                errorMessage ?? "Unknown error");
+
+            try
+            {
+                // Step 1: Get document info (need FilePath for MinIO cleanup)
+                var document = await documentRepository.GetByIdAsync(documentId, cancellationToken);
+
+                if (document == null)
+                {
+                    logger.LogWarning(
+                        "Document {DocumentId} not found in database. Skipping cleanup.",
+                        documentId);
+                    return;
+                }
+
+                var filePath = document.FilePath;
+
+                // Step 2: Delete from PostgreSQL (critical operation)
+                var deletedFromDb = await documentRepository.DeleteAsync(documentId, cancellationToken);
+
+                if (!deletedFromDb)
+                {
+                    logger.LogError(
+                        "Failed to delete document {DocumentId} from database",
+                        documentId);
+                    throw new InvalidOperationException($"Failed to delete document {documentId} from database");
+                }
+
+                logger.LogInformation(
+                    "Successfully deleted failed document {DocumentId} from database",
+                    documentId);
+
+                // Step 3: Delete from MinIO
+                if (!string.IsNullOrWhiteSpace(filePath))
+                {
+                    try
+                    {
+                        await minioService.DeleteFileAsync(filePath);
+                        logger.LogInformation(
+                            "Successfully deleted file from MinIO: {FilePath}",
+                            filePath);
+                    }
+                    catch (Exception minioEx)
+                    {
+                        // Log warning but don't fail the operation
+                        // File might already be deleted or MinIO might be temporarily unavailable
+                        logger.LogWarning(minioEx,
+                            "Failed to delete file from MinIO (non-critical): {FilePath}. Manual cleanup may be required.",
+                            filePath);
+                    }
+                }
+
+                logger.LogInformation(
+                    "Cleanup completed for failed document {DocumentId}",
+                    documentId);
+
+                // TODO: Notify user via SignalR about processing failure
+                // await _hubContext.Clients.User(userId)
+                //     .SendAsync("DocumentProcessingFailed", new { 
+                //         id = documentId, 
+                //         error = errorMessage
+                //     });
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex,
+                    "Critical error during cleanup of failed document {DocumentId}",
+                    documentId);
+                throw; // Re-throw for MassTransit retry
+            }
+        }
+
         }
     }
 }

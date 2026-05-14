@@ -3,13 +3,13 @@ using Minio.DataModel.Args;
 
 namespace DocAssistant.Gateway.Services
 {
-    public class MinioService : IMinioService
+    public class MinIOService : IMinIOService
     {
         private readonly IMinioClient _minioClient;
         private readonly string _bucketName;
-        private readonly ILogger<MinioService> _logger;
+        private readonly ILogger<MinIOService> _logger;
 
-        public MinioService(IConfiguration configuration, ILogger<MinioService> logger)
+        public MinIOService(IConfiguration configuration, ILogger<MinIOService> logger)
         {
             _logger = logger;
 
@@ -70,9 +70,9 @@ namespace DocAssistant.Gateway.Services
 
                 await _minioClient.PutObjectAsync(putObjectArgs);
 
-                _logger.LogInformation("Uploaded file to MinIO: {ObjectName}", objectName);
+                _logger.LogInformation("Uploaded file to MinIO bucket '{BucketName}': {ObjectName}", _bucketName, objectName);
 
-                return $"{_bucketName}/{objectName}";
+                return objectName;
             }
             catch (Exception ex)
             {

@@ -30,6 +30,15 @@ namespace DocAssistant.Gateway.Data
                 .Property(m => m.Id)
                 .ValueGeneratedOnAdd();
 
+            // Configure enums to store as integers (fix PostgreSQL varchar issue)
+            modelBuilder.Entity<ChatMessage>()
+                .Property(m => m.Role)
+                .HasConversion<int>();
+
+            modelBuilder.Entity<Document>()
+                .Property(d => d.Status)
+                .HasConversion<int>();
+
             // Configure Document -> Chat relationship (Cascade Delete)
             modelBuilder.Entity<Models.Document>()
                 .HasOne(d => d.Chat)
@@ -45,13 +54,18 @@ namespace DocAssistant.Gateway.Data
                 .OnDelete(DeleteBehavior.Cascade);
 
             // Configure indexes (for better query performance)
-            modelBuilder.Entity<Models.Document>()
+            modelBuilder.Entity<Document>()
                 .HasIndex(d => d.ChatId);
+
+            // Composite index for document validation queries (ChatId + Status)
+            modelBuilder.Entity<Document>()
+                .HasIndex(d => new { d.ChatId, d.Status })
+                .HasDatabaseName("IX_Documents_ChatId_Status");
 
             modelBuilder.Entity<ChatMessage>()
                 .HasIndex(m => m.ChatId);
 
-            modelBuilder.Entity<Models.Document>()
+            modelBuilder.Entity<Document>()
                 .HasIndex(d => d.Status);
         }
 

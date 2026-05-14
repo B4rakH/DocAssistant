@@ -1,4 +1,5 @@
 using DocAssistant.Gateway.Common;
+using DocAssistant.Gateway.Consumers;
 using DocAssistant.Gateway.Data;
 using DocAssistant.Gateway.Repositories;
 using DocAssistant.Gateway.Services;
@@ -24,11 +25,13 @@ namespace DocAssistant.Gateway
 
             // Add services to the container.
             builder.Services.AddScoped<IChatService, ChatService>();
-            builder.Services.AddSingleton<IMinioService, MinioService>();
+            builder.Services.AddSingleton<IMinIOService, MinIOService>();
 
             builder.Services.AddMassTransit(x =>
             {
+                // Register consumers
                 x.AddConsumer<DocumentResultConsumer>();
+                x.AddConsumer<ChatMessageResponseConsumer>();
 
                 x.UsingRabbitMq((context, cfg) =>
                 {
@@ -40,12 +43,18 @@ namespace DocAssistant.Gateway
 
                     cfg.UseRawJsonDeserializer();
 
-                    
+                    // Document processing results
                     cfg.ReceiveEndpoint(QueueNames.fileUploadResultQueue, e =>
                     {
                         e.ConfigureConsumer<DocumentResultConsumer>(context);
+                        e.UseMessageRetry(r => r.Interval(3, TimeSpan.FromSeconds(5)));
+                    });
 
-                        //e.UseMessageRetry(r => r.Interval(3, TimeSpan.FromSeconds(5)));
+                    // Chat message responses from AI service
+                    cfg.ReceiveEndpoint(QueueNames.chatMessageResponseQueue, e =>
+                    {
+                        e.ConfigureConsumer<ChatMessageResponseConsumer>(context);
+                        e.UseMessageRetry(r => r.Interval(3, TimeSpan.FromSeconds(5)));
                     });
                 });
             });
@@ -64,7 +73,7 @@ namespace DocAssistant.Gateway
             // Ensure MinIO bucket exists
             using (var scope = app.Services.CreateScope())
             {
-                var minioService = scope.ServiceProvider.GetRequiredService<IMinioService>();
+                var minioService = scope.ServiceProvider.GetRequiredService<IMinIOService>();
                 await minioService.EnsureBucketExistsAsync();
             }
 

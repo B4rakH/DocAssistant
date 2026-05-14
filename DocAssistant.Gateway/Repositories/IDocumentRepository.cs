@@ -14,5 +14,10 @@ namespace DocAssistant.Gateway.Repositories
             string? failureReason = null,
             CancellationToken cancellationToken = default);
 
+        Task<bool> AllDocumentsCompletedAsync(Guid chatId);
+
+        Task<Document?> GetByIdAsync(Guid documentId, CancellationToken cancellationToken = default);
+
+        Task<bool> DeleteAsync(Guid documentId, CancellationToken cancellationToken = default);
     }
 }

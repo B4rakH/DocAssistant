@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using DocAssistant.Gateway.Common.Enums;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace DocAssistant.Gateway.Data.Models
@@ -13,8 +14,7 @@ namespace DocAssistant.Gateway.Data.Models
         public Guid ChatId { get; set; }
 
         [Required]
-        [MaxLength(20)]
-        public string Role { get; set; } = string.Empty; // "user" or "assistant"
+        public string Role { get; set; } = null!; // Should be either "USER" or "ASSISTANT"
 
         [Required]
         public string Content { get; set; } = string.Empty;

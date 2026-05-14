@@ -1,4 +1,4 @@
-﻿using System.Text.Json.Serialization;
+using System.Text.Json.Serialization;
 
 namespace DocAssistant.Gateway.Dtos.Events;
 
@@ -12,4 +12,7 @@ public record DocumentProcessedEvent
 
     [JsonPropertyName("error_message")]
     public string? ErrorMessage { get; set; }
+
+    [JsonPropertyName("correlation_id")]
+    public Guid? CorrelationId { get; set; }
 }

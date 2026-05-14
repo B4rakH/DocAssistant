@@ -1,11 +1,13 @@
-﻿using DocAssistant.Gateway.Services;
+using DocAssistant.Gateway.Dtos.Chat;
+using DocAssistant.Gateway.Dtos.ChatMessage;
+using DocAssistant.Gateway.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace DocAssistant.Gateway.Controllers
 {
-    [Route("api/chat")]
     [ApiController]
+    [Route("api/chats")]
     public class ChatController(
         ILogger<ChatController> logger,
         IChatService chatService) : ControllerBase
@@ -30,37 +32,24 @@ namespace DocAssistant.Gateway.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> CreateChat([FromForm] string chatName)
+        public async Task<IActionResult> CreateChat([FromBody] CreateChatRequest request)
         {
-
-            /* TODO: Implement this scenario:
-             * User uploads files
-             * uploaded files saved in database with loading status
-             * frontend keeps file state as loading
-             * RabbitMQ sends files to the AI Service
-             * AI Service performs vectorizing and saving files
-             * AI Service returns success if it is
-                ** AI Service fails (with SignalR ?)
-             * Based on return, file status updated
-             * Based on last file status, frontend updates state
-             * **/
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
 
             try
             {
-                var chat = await chatService.CreateChatAsync(chatName);
+                var chat = await chatService.CreateChatAsync(request.Name);
 
                 return Ok(new
                 {
                     ChatId = chat.Id,
-                    Message = "Chat created successfully. Waiting documents to be uploaded."
+                    Message = "Chat created successfully. You can now upload documents."
                 });
             }
             catch (Exception ex)
             {
-                // Log the generic error here (Specific errors were logged in the Service)
                 logger.LogError(ex, "Error in CreateChat endpoint");
-
-                // Return 500 Internal Server Error
                 return StatusCode(500, "An error occurred while creating the chat. Please try again.");
             }
         }
@@ -96,24 +85,17 @@ namespace DocAssistant.Gateway.Controllers
         }
 
         [HttpPost("{chatId:Guid}/message")]
-        public async Task<IActionResult> PostMessage([FromBody] string message, [FromRoute] Guid chatId)
+        public async Task<IActionResult> PostMessage(
+            [FromBody] ChatMessageRequest request,
+            [FromRoute] Guid chatId)
         {
             // TODO: Implement message posting logic
-            // CRITICAL: Do not allow post message if chat has any failed (or loading?) document uploads
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
 
-            if(message == string.Empty) return BadRequest("Message cannot be empty");
-
-            var response = await chatService.PostMessageAsync(chatId, message);
+            var response = await chatService.PostMessageAsync(chatId, request);
 
             return Ok(response);
-        }
-
-        [HttpDelete]
-        public async Task<IActionResult> Delete([FromBody] Guid chatId)
-        {
-            await chatService.DeleteChatAsync(chatId);
-
-            return NoContent();
         }
 
     }

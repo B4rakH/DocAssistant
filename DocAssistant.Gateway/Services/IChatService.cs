@@ -11,7 +11,7 @@ namespace DocAssistant.Gateway.Services
 
         Task<Chat?> GetByIdAsync(Guid chatId);
 
-        Task<ChatMessageResponse> PostMessageAsync(Guid chatId, string message);
+        Task<ChatMessageResponse> PostMessageAsync(Guid chatId, ChatMessageRequest request);
 
         Task UploadFilesAsync(Guid chatId, List<IFormFile> files);
         

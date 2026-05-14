@@ -1,4 +1,4 @@
-﻿using DocAssistant.Gateway.Common.Enums;
+using DocAssistant.Gateway.Common.Enums;
 using DocAssistant.Gateway.Data.Models;
 using DocAssistant.Gateway.Dtos.Events;
 
@@ -15,7 +15,7 @@ namespace DocAssistant.Gateway.Mappers
                 FilePath = filePath,
                 FileSize = file.Length,
                 ContentType = file.ContentType,
-                Status = DocumentStatus.Loading
+                Status = status  // Use the passed status parameter
             };
         }
 
@@ -27,7 +27,8 @@ namespace DocAssistant.Gateway.Mappers
                 DocumentId = document.Id,
                 FilePath = document.FilePath,
                 FileSize = document.FileSize,
-                ContentType = document.ContentType
+                ContentType = document.ContentType,
+                CorrelationId = Guid.NewGuid()
             };
         }
     }
