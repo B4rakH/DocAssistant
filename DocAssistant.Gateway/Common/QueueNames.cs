@@ -10,5 +10,7 @@ namespace DocAssistant.Gateway.Common
         public const string chatMessageQueue = "chat.messages.sent";
         public const string chatMessageResponseQueue = "chat.messages.responses";
 
+        // Chat lifecycle queues
+        public const string chatDeletedQueue = "chat.deleted";
     }
 }

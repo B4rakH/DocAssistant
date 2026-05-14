@@ -1,4 +1,4 @@
-using DocAssistant.Gateway.Dtos.Chat;
+﻿using DocAssistant.Gateway.Dtos.Chat;
 using DocAssistant.Gateway.Dtos.ChatMessage;
 using DocAssistant.Gateway.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -96,6 +96,26 @@ namespace DocAssistant.Gateway.Controllers
             var response = await chatService.PostMessageAsync(chatId, request);
 
             return Ok(response);
+        }
+
+        [HttpDelete("{chatId:Guid}")]
+        public async Task<IActionResult> Delete([FromRoute] Guid chatId)
+        {
+            try
+            {
+                await chatService.DeleteChatAsync(chatId);
+                return NoContent();
+            }
+            catch (KeyNotFoundException ex)
+            {
+                logger.LogWarning(ex, "Chat not found: {ChatId}", chatId);
+                return NotFound($"Chat with ID {chatId} not found");
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error deleting chat {ChatId}", chatId);
+                return StatusCode(500, "An error occurred while deleting the chat");
+            }
         }
 
     }

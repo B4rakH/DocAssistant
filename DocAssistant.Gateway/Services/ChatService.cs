@@ -238,7 +238,26 @@ namespace DocAssistant.Gateway.Services
             };
         }
 
+        public async Task DeleteChatAsync(Guid chatId)
+        {
+            // 1. Load document file paths before cascade delete removes them
+            var documentFilePaths = await context.Documents
+                .Where(d => d.ChatId == chatId)
+                .Select(d => d.FilePath)
+                .ToListAsync();
 
+            // 2. Delete chat from database (cascade deletes Messages + Documents)
+            await chatRepository.DeleteAsync(chatId);
+
+            // 3. Cleanup MinIO files (best-effort, don't fail the operation)
+            if (documentFilePaths.Count > 0)
+            {
+                await CleanupMinioFilesAsync(documentFilePaths);
+            }
+
+            // 4. Notify AI Service to delete Qdrant collection (fire-and-forget)
+            await SendChatDeletedEventAsync(chatId);
+        }
 
         private async Task SendDocumentAsync(List<Document> documents)
         {
@@ -306,6 +325,28 @@ namespace DocAssistant.Gateway.Services
             }
         }
 
+        private async Task SendChatDeletedEventAsync(Guid chatId)
+        {
+            try
+            {
+                var endpoint = await endpointProvider.GetSendEndpoint(new Uri($"queue:{QueueNames.chatDeletedQueue}"));
 
+                var deletedEvent = new ChatDeletedEvent
+                {
+                    ChatId = chatId,
+                    CorrelationId = Guid.NewGuid()
+                };
+
+                await endpoint.Send(deletedEvent);
+
+                logger.LogInformation("Sent ChatDeletedEvent for chat {ChatId} [CorrelationId: {CorrelationId}]",
+                    chatId, deletedEvent.CorrelationId);
+            }
+            catch (Exception ex)
+            {
+                // Log but don't throw — chat is already deleted from DB
+                logger.LogWarning(ex, "Failed to send ChatDeletedEvent for chat {ChatId}. AI Service cleanup may be needed manually.", chatId);
+            }
+        }
     }
 }
