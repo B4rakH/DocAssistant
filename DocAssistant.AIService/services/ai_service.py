@@ -4,7 +4,7 @@ Handles PDF extraction, text chunking, and embedding generation
 """
 
 import os
-from typing import List, Dict, Optional
+from typing import List, Dict
 import pdfplumber
 from PyPDF2 import PdfReader
 from sentence_transformers import SentenceTransformer
@@ -18,7 +18,7 @@ class AIService:
     Main AI service for processing documents
     """
     
-    def __init__(self, embedding_model_name: str = "BAAI/bge-small-en-v1.5"):
+    def __init__(self, embedding_model_name: str):
         """
         Initialize the AI service
         
@@ -218,36 +218,3 @@ class AIService:
         logger.info(f"Embeddings generated (dimension: {len(embeddings[0])})")
         return chunks
 
-
-# Test the extraction if run directly
-if __name__ == "__main__":
-    service = AIService()
-    
-    # Test with a sample PDF (you can change this path)
-    test_pdf = "../uploaded_test_files/sample.pdf"
-    
-    if os.path.exists(test_pdf):
-        try:
-            # Test extraction
-            text = service.extract_text_from_pdf(test_pdf)
-            print(f"\nFirst 500 characters:\n{text[:500]}...")
-            
-            # Test chunking
-            print("\n" + "="*60)
-            chunks = service.chunk_text(text)
-            print(f"\nFirst chunk preview:")
-            print(f"  Index: {chunks[0]['index']}")
-            print(f"  Length: {chunks[0]['length']} chars")
-            print(f"  Text: {chunks[0]['text'][:200]}...")
-            
-            # Test embedding generation
-            print("\n" + "="*60)
-            chunks_with_embeddings = service.generate_embeddings(chunks)
-            print(f"\nFirst embedding info:")
-            print(f"  Chunk index: {chunks_with_embeddings[0]['index']}")
-            print(f"  Embedding dimension: {chunks_with_embeddings[0]['embedding_dim']}")
-            print(f"  First 5 values: {chunks_with_embeddings[0]['embedding'][:5]}")
-        except Exception as e:
-            print(f"ERROR: {e}")
-    else:
-        print(f"WARNING: Test file not found: {test_pdf}")
